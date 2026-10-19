@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Corta Fruta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Baloo+2:wght@500;700;800&display=swap">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+<style>
+/* Layout: tabla de cortar a pantalla completa; las frutas saltan desde abajo y se cortan deslizando el dedo */
+:root {
+  --bg: #3b2416;
+  --ink: #fff5e6;
+  --muted: #e3c8aa;
+  --panel: rgba(52, 30, 17, 0.9);
+  --line: rgba(255, 220, 170, 0.22);
+  --accent: #ff5a36;
+  --onaccent: #fff8f0;
+  --gold: #ffcf3f;
+  --ongold: #3a2400;
+  --goldline: rgba(255, 207, 63, 0.45);
+  --goldtint: rgba(255, 207, 63, 0.12);
+  --veil: rgba(30, 16, 8, 0.45);
+  --shadow: rgba(0, 0, 0, 0.4);
+  --display: "Luckiest Guy", "Impact", system-ui, sans-serif;
+  --body: "Baloo 2", "Trebuchet MS", system-ui, sans-serif;
+  color-scheme: dark;
+}
+</style>
+</head>
+<body>
+<div id="app"><canvas id="c" aria-label="Juego Corta Fruta"></canvas></div>
+<script src="config.js"></script>
+<script src="comun.js"></script>
+<script>
+(() => {
+  'use strict';
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  let W = 0, H = 0, DPR = 1, U = 1;
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = canvas.clientWidth || innerWidth; H = canvas.clientHeight || innerHeight;
+    canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    U = clamp(Math.min(W, H) / 300, 1, 2);
+    board = null;
+  }
+  addEventListener('resize', resize);
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  const TYPES = [
+    { name: 'sandia', r: 34, skin: '#2f9e44', skin2: '#1f6f2f', flesh: '#ff4d6d', juice: '#ff4d6d', seeds: '#2a1a12' },
+    { name: 'naranja', r: 26, skin: '#ff9a1f', skin2: '#e07800', flesh: '#ffc56b', juice: '#ffa62b' },
+    { name: 'kiwi', r: 22, skin: '#8a5a2b', skin2: '#6a4220', flesh: '#8fd14f', juice: '#9be15d', seeds: '#1d1d1d' },
+    { name: 'limon', r: 22, skin: '#f7e03c', skin2: '#d8c120', flesh: '#fff2a0', juice: '#f7e03c' },
+    { name: 'coco', r: 27, skin: '#6b4423', skin2: '#4e3018', flesh: '#fffaf0', juice: '#f3efe6' },
+    { name: 'mango', r: 25, skin: '#ff7b54', skin2: '#f5b700', flesh: '#ffb703', juice: '#ffb703' }
+  ];
+  const GOLD = { name: 'oro', r: 24, skin: '#ffd23f', skin2: '#d9a400', flesh: '#fff3b0', juice: '#ffe066' };
+
+  let items = [], halves = [], splats = [], drops = [], trail = [], popups = [];
+  let lives = 3, spawnT = 0, elapsed = 0, sliced = 0, comboWin = [], shake = 0, board = null;
+
+  function G() { return 900 * (H / 800); }
+  function launch(kind) {
+    const isBomb = kind === 'bomb', type = isBomb ? null : kind === 'gold' ? GOLD : TYPES[Math.floor(Math.random() * TYPES.length)];
+    const r = (isBomb ? 26 : type.r) * U;
+    const x = rand(W * 0.15, W * 0.85), h = rand(H * 0.5, H * 0.85);
+    const vy = -Math.sqrt(2 * G() * h);
+    const vx = (W / 2 - x) * rand(0.25, 0.7) / (Math.abs(vy) / G());
+    items.push({ x, y: H + r, vx, vy, r, type, bomb: isBomb, gold: kind === 'gold', rot: rand(0, 6), vr: rand(-3, 3), cut: false });
+  }
+  function wave() {
+    const diff = Math.min(1, elapsed / 90);
+    const n = 1 + Math.floor(Math.random() * (1.5 + diff * 3));
+    for (let i = 0; i < n; i++) setTimeout(() => { if (shell.playing()) launch(Math.random() < 0.04 ? 'gold' : 'fruit'); }, i * rand(90, 220));
+    if (elapsed > 6 && Math.random() < 0.18 + diff * 0.27) setTimeout(() => { if (shell.playing()) launch('bomb'); }, rand(100, 400));
+  }
+  function reset() { items = []; halves = []; splats = []; drops = []; trail = []; popups = []; lives = 3; spawnT = 1.0; elapsed = 0; sliced = 0; comboWin = []; }
+
+  function cutFruit(f, ang) {
+    f.cut = true;
+    const nx = Math.cos(ang + Math.PI / 2), ny = Math.sin(ang + Math.PI / 2);
+    for (const s of [-1, 1]) halves.push({ x: f.x, y: f.y, vx: f.vx + nx * s * 90, vy: f.vy + ny * s * 90 - 60, r: f.r, type: f.type, ang, side: s, rot: 0, vr: s * rand(2, 5) });
+    for (let i = 0; i < 12; i++) drops.push({ x: f.x, y: f.y, vx: rand(-220, 220), vy: rand(-260, 80), life: rand(0.4, 0.8), c: f.type.juice, r: rand(2, 4.5) * U });
+    splats.push({ x: f.x, y: f.y, r: f.r * rand(1.1, 1.5), c: f.type.juice, life: 2.5, seed: Math.random() * 10 });
+    sliced++; shell.addBase(10);
+    if (f.gold) { shell.coin(3); popups.push({ x: f.x, y: f.y, txt: '+3 monedas', life: 1 }); shell.tone(880, 1760, 0.2, 'triangle', 0.1); }
+    shell.tone(rand(500, 700), rand(200, 300), 0.09, 'sawtooth', 0.05); shell.haptic('light');
+    comboWin.push(performance.now());
+  }
+  function checkCombo() {
+    const now = performance.now();
+    comboWin = comboWin.filter((t) => now - t < 260);
+    if (comboWin.length >= 3 && !checkCombo.lock) {
+      const n = comboWin.length;
+      shell.addBase(n * 10); shell.coin(1);
+      popups.push({ x: W / 2, y: H * 0.35, txt: `¡Combo x${n}! +1 moneda`, life: 1.2, big: true });
+      shell.tone(660, 1320, 0.25, 'square', 0.06); shell.haptic('medium');
+      checkCombo.lock = true; setTimeout(() => { checkCombo.lock = false; comboWin = []; }, 300);
+    }
+  }
+  function loseLife(x) {
+    lives--; popups.push({ x: clamp(x, 40, W - 40), y: H - 60, txt: '¡Se escapó!', life: 1, bad: true });
+    shell.tone(220, 140, 0.25, 'triangle', 0.1); shell.haptic('heavy');
+    if (lives <= 0) { shell.noise(0.3, 0.2, 400); shell.crash(); }
+  }
+
+  const shell = Arcade.create({
+    id: 'fruta', title: ['Corta', 'Fruta'], bg: '#3b2416',
+    tagline: 'Desliza el dedo y corta toda la fruta tropical que salte.',
+    how: ['<b>Desliza el dedo</b> por encima de la fruta para cortarla.', 'Corta 3 o más de un solo tajo para hacer combo y ganar una moneda. La fruta dorada da 3 monedas.', '<b>No toques las bombas</b>. Si se te escapan 3 frutas, pierdes.'],
+    coinValue: 25, rivalTop: 4200, statLabel: 'Cortadas',
+    crashTitle: '¡Se acabó la fruta!', reviveLabel: 'Seguir cortando', reviveReward: 'recuperar las 3 vidas', countdown: true,
+    onStart() { reset(); },
+    onGo() {},
+    onRevive() { lives = 3; items = items.filter((i) => !i.bomb); items.forEach((i) => (i.cut = true)); items = []; spawnT = 1; },
+    onMenu() { reset(); },
+    badges: () => (shell.state === 'menu' ? [] : ['Vidas ' + '●'.repeat(Math.max(0, lives)) + '○'.repeat(Math.max(0, 3 - lives))])
+  });
+
+  // Corte con el dedo
+  let down = false, lastP = null;
+  function segHitsCircle(ax, ay, bx, by, cx, cy, r) {
+    const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+    let t = l2 ? ((cx - ax) * dx + (cy - ay) * dy) / l2 : 0; t = clamp(t, 0, 1);
+    const px = ax + dx * t - cx, py = ay + dy * t - cy; return px * px + py * py < r * r;
+  }
+  function move(x, y) {
+    const now = performance.now();
+    trail.push({ x, y, t: now });
+    if (lastP && shell.playing()) {
+      const d = Math.hypot(x - lastP.x, y - lastP.y);
+      if (d > 4) {
+        const ang = Math.atan2(y - lastP.y, x - lastP.x);
+        for (const it of items) {
+          if (it.cut || !segHitsCircle(lastP.x, lastP.y, x, y, it.x, it.y, it.r * 1.1)) continue;
+          if (it.bomb) {
+            it.cut = true; shake = 0.6;
+            for (let i = 0; i < 26; i++) drops.push({ x: it.x, y: it.y, vx: rand(-400, 400), vy: rand(-400, 300), life: rand(0.4, 0.9), c: i % 2 ? '#ffcf3f' : '#ff5a36', r: rand(2, 6) * U });
+            shell.noise(0.6, 0.6, 700); shell.crash(); return;
+          }
+          cutFruit(it, ang);
+        }
+        checkCombo();
+      }
+    }
+    lastP = { x, y };
+  }
+  const pos = (e) => { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  canvas.addEventListener('pointerdown', (e) => { e.preventDefault(); Arcade.audio(); down = true; lastP = null; const [x, y] = pos(e); move(x, y); });
+  canvas.addEventListener('pointermove', (e) => { if (!down) return; const [x, y] = pos(e); move(x, y); });
+  addEventListener('pointerup', () => { down = false; lastP = null; });
+  addEventListener('pointercancel', () => { down = false; lastP = null; });
+
+  function update(dt) {
+    const g = G();
+    const playing = shell.playing();
+    if (playing) {
+      elapsed += dt; spawnT -= dt;
+      if (spawnT <= 0) { wave(); spawnT = clamp(1.6 - elapsed / 80, 0.65, 1.6) + rand(0, 0.4); }
+      shell.stat = sliced;
+    } else if (shell.state === 'menu') {
+      spawnT -= dt; if (spawnT <= 0) { launch('fruit'); spawnT = 1.1; }
+    }
+    if (playing || shell.state === 'menu' || shell.state === 'dying') {
+      for (const it of items) { it.vy += g * dt; it.x += it.vx * dt; it.y += it.vy * dt; it.rot += it.vr * dt; }
+      for (const it of items) {
+        if (!it.cut && it.vy > 0 && it.y - it.r > H) { it.cut = true; if (!it.bomb && playing) loseLife(it.x); }
+      }
+      items = items.filter((i) => !i.cut);
+    }
+    for (const h of halves) { h.vy += g * dt; h.x += h.vx * dt; h.y += h.vy * dt; h.rot += h.vr * dt; }
+    halves = halves.filter((h) => h.y - h.r < H + 40);
+    for (const d of drops) { d.vy += g * 0.8 * dt; d.x += d.vx * dt; d.y += d.vy * dt; d.life -= dt; }
+    drops = drops.filter((d) => d.life > 0);
+    for (const s of splats) s.life -= dt; splats = splats.filter((s) => s.life > 0);
+    for (const p of popups) { p.life -= dt; p.y -= 30 * dt; } popups = popups.filter((p) => p.life > 0);
+    const now = performance.now(); trail = trail.filter((p) => now - p.t < 140);
+    shake = Math.max(0, shake - dt);
+  }
+
+  function drawBoard() {
+    if (!board) {
+      board = document.createElement('canvas'); board.width = Math.round(W * DPR); board.height = Math.round(H * DPR);
+      const b = board.getContext('2d'); b.scale(DPR, DPR);
+      const g = b.createLinearGradient(0, 0, W, H); g.addColorStop(0, '#6b4226'); g.addColorStop(1, '#4a2c17'); b.fillStyle = g; b.fillRect(0, 0, W, H);
+      const plank = 64 * U;
+      for (let x = 0; x < W; x += plank) {
+        b.fillStyle = 'rgba(0,0,0,0.18)'; b.fillRect(x, 0, 2, H);
+        b.strokeStyle = 'rgba(255,220,170,0.06)'; b.lineWidth = 1;
+        for (let k = 0; k < 6; k++) { b.beginPath(); const ox = x + rand(8, plank - 8); b.moveTo(ox, 0); for (let y = 0; y <= H; y += 40) b.lineTo(ox + Math.sin(y * 0.01 + k) * 4, y); b.stroke(); }
+      }
+      const v = b.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.75);
+      v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.45)'); b.fillStyle = v; b.fillRect(0, 0, W, H);
+    }
+    ctx.drawImage(board, 0, 0, W, H);
+  }
+  function drawFruit(f) {
+    const t = f.type, r = f.r;
+    ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.rot);
+    const g = ctx.createRadialGradient(-r * 0.35, -r * 0.35, r * 0.1, 0, 0, r); g.addColorStop(0, t.skin); g.addColorStop(1, t.skin2);
+    ctx.fillStyle = g; ctx.beginPath();
+    if (t.name === 'limon' || t.name === 'mango') ctx.ellipse(0, 0, r * 1.15, r * 0.9, 0, 0, Math.PI * 2); else ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+    if (t.name === 'sandia') { ctx.strokeStyle = '#1b5e2a'; ctx.lineWidth = 3 * U; for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.ellipse(i * r * 0.32, 0, r * 0.12, r * 0.95, 0, 0, Math.PI * 2); ctx.stroke(); } }
+    if (t.name === 'coco') { ctx.fillStyle = '#2b1a0c'; [[-0.2, -0.3], [0.15, -0.35], [0, -0.1]].forEach(([a, b]) => { ctx.beginPath(); ctx.arc(a * r, b * r, r * 0.09, 0, Math.PI * 2); ctx.fill(); }); }
+    if (t.name === 'oro') { ctx.strokeStyle = '#fff6c2'; ctx.lineWidth = 2 * U; ctx.beginPath(); for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * Math.PI * 2 / 5; ctx.lineTo(Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.55); ctx.lineTo(Math.cos(a + Math.PI / 5) * r * 0.25, Math.sin(a + Math.PI / 5) * r * 0.25); } ctx.closePath(); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.ellipse(-r * 0.35, -r * 0.4, r * 0.25, r * 0.13, -0.6, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    if (f.gold) { ctx.strokeStyle = 'rgba(255,230,120,0.6)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(f.x, f.y, r + 6 + Math.sin(performance.now() / 120) * 2, 0, Math.PI * 2); ctx.stroke(); }
+  }
+  function drawHalf(h) {
+    const t = h.type, r = h.r;
+    ctx.save(); ctx.translate(h.x, h.y); ctx.rotate(h.ang + h.rot);
+    ctx.beginPath(); ctx.arc(0, 0, r, h.side > 0 ? 0 : Math.PI, h.side > 0 ? Math.PI : Math.PI * 2); ctx.closePath();
+    ctx.fillStyle = t.skin; ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.84, h.side > 0 ? 0 : Math.PI, h.side > 0 ? Math.PI : Math.PI * 2); ctx.closePath();
+    ctx.fillStyle = t.flesh; ctx.fill();
+    if (t.seeds) { ctx.fillStyle = t.seeds; for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.ellipse(i * r * 0.25, h.side * r * 0.35, r * 0.05, r * 0.09, 0, 0, Math.PI * 2); ctx.fill(); } }
+    ctx.restore();
+  }
+  function drawBomb(b) {
+    ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.rot);
+    const g = ctx.createRadialGradient(-b.r * 0.3, -b.r * 0.3, 2, 0, 0, b.r); g.addColorStop(0, '#555'); g.addColorStop(1, '#111');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, b.r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#ff3b30'; ctx.lineWidth = 3 * U; ctx.beginPath(); ctx.arc(0, 0, b.r * 0.62, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#333'; ctx.fillRect(-5 * U, -b.r - 6 * U, 10 * U, 8 * U);
+    ctx.strokeStyle = '#c8a26b'; ctx.lineWidth = 2 * U; ctx.beginPath(); ctx.moveTo(0, -b.r - 6 * U); ctx.quadraticCurveTo(8 * U, -b.r - 16 * U, 4 * U, -b.r - 22 * U); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = Math.random() < 0.5 ? '#ffcf3f' : '#ff7b2f'; ctx.beginPath(); ctx.arc(b.x + Math.cos(b.rot) * 2, b.y - b.r - 22 * U, rand(3, 6) * U, 0, Math.PI * 2); ctx.fill();
+  }
+  function draw() {
+    ctx.save();
+    if (shake > 0) ctx.translate(rand(-1, 1) * shake * 16, rand(-1, 1) * shake * 16);
+    drawBoard();
+    for (const s of splats) {
+      ctx.globalAlpha = clamp(s.life / 2.5, 0, 1) * 0.55; ctx.fillStyle = s.c; ctx.beginPath();
+      for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, rr = s.r * (0.7 + 0.3 * Math.sin(s.seed + i * 2.3)); ctx.lineTo(s.x + Math.cos(a) * rr, s.y + Math.sin(a) * rr); }
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    for (const h of halves) drawHalf(h);
+    for (const it of items) it.bomb ? drawBomb(it) : drawFruit(it);
+    for (const d of drops) { ctx.globalAlpha = clamp(d.life * 2, 0, 1); ctx.fillStyle = d.c; ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2); ctx.fill(); }
+    ctx.globalAlpha = 1;
+    // estela del corte
+    if (trail.length > 1) {
+      const now = performance.now();
+      for (let i = 1; i < trail.length; i++) {
+        const a = trail[i - 1], b = trail[i], k = 1 - (now - b.t) / 140;
+        ctx.strokeStyle = `rgba(255,255,255,${0.9 * k})`; ctx.lineWidth = 7 * k * U + 1; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+    }
+    ctx.textAlign = 'center';
+    for (const p of popups) {
+      ctx.globalAlpha = clamp(p.life * 2, 0, 1); ctx.font = `${p.big ? 30 : 20}px "Luckiest Guy", Impact, sans-serif`;
+      ctx.fillStyle = p.bad ? '#ff6b5a' : '#ffcf3f'; ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 4;
+      ctx.strokeText(p.txt, p.x, p.y); ctx.fillText(p.txt, p.x, p.y);
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    update(dt); draw(); shell.paintHud();
+    requestAnimationFrame(frame);
+  }
+  resize(); reset();
+  requestAnimationFrame(frame);
+  window.__game = { shell, move, get items() { return items; }, slashAll() { const its = items.filter((i) => !i.bomb && !i.cut); its.forEach((it) => { lastP = { x: it.x - 40, y: it.y }; move(it.x + 40, it.y); }); lastP = null; } };
+})();
+</script>
+</body>
+</html>

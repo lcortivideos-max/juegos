@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Bote Arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@400;600;700&display=swap">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+/* Layout: una columna estrecha; cabecera con el bote total y la cuenta atrás, y debajo una tarjeta por juego */
+:root {
+  --bg: #0e0b1a;
+  --surface: #1a1530;
+  --line: rgba(190, 170, 255, 0.16);
+  --ink: #f3efff;
+  --muted: #a99fcb;
+  --gold: #ffcf3f;
+  --display: "Bungee", "Impact", system-ui, sans-serif;
+  --body: "Chakra Petch", "Trebuchet MS", system-ui, sans-serif;
+  color-scheme: dark;
+}
+html, body { margin: 0; min-height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); -webkit-tap-highlight-color: transparent; }
+.wrap { max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; padding-block: calc(env(safe-area-inset-top, 0px) + 20px) calc(env(safe-area-inset-bottom, 0px) + 28px); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header { display: flex; flex-direction: column; gap: 12px; }
+.brand { font-family: var(--display); font-size: clamp(30px, 9vw, 40px); line-height: 1; margin: 0; letter-spacing: .01em; }
+.brand span { color: var(--gold); }
+.hello { margin: 0; color: var(--muted); font-size: 15px; }
+.pot { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 6px 12px; padding: 16px; border-radius: 18px; background: linear-gradient(135deg, rgba(255, 207, 63, 0.16), rgba(255, 207, 63, 0.03)); border: 1px solid rgba(255, 207, 63, 0.35); }
+.pot .lbl { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.pot .amt { font-family: var(--display); font-size: 34px; color: var(--gold); font-variant-numeric: tabular-nums; grid-row: span 2; align-self: center; }
+.pot .when { font-size: 14px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.pot .split { grid-column: 1 / -1; font-size: 13px; color: var(--muted); }
+h2 { font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin: 6px 0 -6px; font-weight: 600; }
+.games { display: grid; gap: 12px; }
+.game { display: grid; grid-template-columns: 76px 1fr; gap: 14px; align-items: center; padding: 12px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); text-decoration: none; color: inherit; transition: transform .08s ease; }
+.game:active { transform: scale(.98); }
+.game:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.art { width: 76px; height: 76px; border-radius: 14px; display: grid; place-items: center; overflow: hidden; }
+.art svg { width: 54px; height: 54px; }
+.info { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.name { font-family: var(--display); font-size: 19px; line-height: 1.1; }
+.desc { font-size: 13.5px; color: var(--muted); line-height: 1.35; }
+.me { font-size: 13px; font-variant-numeric: tabular-nums; margin-top: 3px; }
+.me b { color: var(--gold); font-weight: 700; }
+.note { font-size: 12px; color: var(--muted); text-align: center; margin: 4px 0 0; opacity: .85; }
+@media (prefers-reduced-motion: reduce) { .game { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 class="brand">Bote<br><span>Arcade</span></h1>
+    <p class="hello" id="hello">Cinco juegos, un bote cada semana. Elige uno y entra en el ranking.</p>
+    <div class="pot">
+      <span class="lbl">Bote de esta semana</span>
+      <span class="amt" id="pot">252,00 €</span>
+      <span class="when" id="when">Se reparte el domingo a las 23:59</span>
+      <span class="split" id="split">Cada juego tiene su ranking y su parte del bote. Premios para los 20 primeros de cada uno.</span>
+    </div>
+  </header>
+
+  <h2>Juegos</h2>
+  <div class="games" id="games"></div>
+  <p class="note">Prototipo: el bote y los rivales son de ejemplo hasta conectar el servidor.</p>
+</div>
+<script src="config.js"></script>
+<script src="comun.js"></script>
+<script>
+(() => {
+  'use strict';
+  Arcade.tgInit('#0e0b1a');
+  const GAMES = [
+    { id: 'ruta', file: 'ruta-neon.html', name: 'Ruta Neón', desc: 'Corre por la ciudad, salta y esquiva sin parar.', top: 9000,
+      bg: 'linear-gradient(160deg,#2a1257,#ff3d9a)', svg: '<svg viewBox="0 0 54 54"><path d="M6 50 L22 18 H32 L48 50 Z" fill="#140d33"/><path d="M27 20 V50" stroke="#2de2e6" stroke-width="2.5" stroke-dasharray="5 4"/><circle cx="27" cy="13" r="8" fill="#ffc93c"/></svg>' },
+    { id: 'pila', file: 'pila-zen.html', name: 'Pila Zen', desc: 'Apila bloques en el templo y llega lo más alto posible.', top: 1600,
+      bg: 'linear-gradient(160deg,#ffd9c2,#c9b6e4)', svg: '<svg viewBox="0 0 54 54"><rect x="14" y="38" width="26" height="8" fill="#8e8199"/><rect x="16" y="30" width="22" height="8" fill="#f28fb0"/><rect x="18" y="22" width="18" height="8" fill="#c79bf2"/><rect x="20" y="14" width="14" height="8" fill="#8fc5f2"/><path d="M6 10 H48 M10 16 H44" stroke="#d23f5f" stroke-width="3"/></svg>' },
+    { id: 'abismo', file: 'abismo.html', name: 'El Abismo', desc: 'Pilota un submarino por una cueva cada vez más estrecha.', top: 3200,
+      bg: 'linear-gradient(160deg,#0a4a5c,#031a26)', svg: '<svg viewBox="0 0 54 54"><ellipse cx="25" cy="28" rx="15" ry="9" fill="#ffd23f"/><rect x="21" y="15" width="8" height="6" fill="#e8a91c"/><circle cx="30" cy="27" r="3.5" fill="#7ef0ff"/><circle cx="44" cy="20" r="2.5" fill="none" stroke="#bff8ff"/><circle cx="47" cy="12" r="1.8" fill="none" stroke="#bff8ff"/></svg>' },
+    { id: 'fruta', file: 'corta-fruta.html', name: 'Corta Fruta', desc: 'Corta fruta tropical de un tajo y esquiva las bombas.', top: 4200,
+      bg: 'linear-gradient(160deg,#6b4226,#3b2416)', svg: '<svg viewBox="0 0 54 54"><path d="M8 30 A19 19 0 0 0 46 30 Z" fill="#2f9e44"/><path d="M11 30 A16 16 0 0 0 43 30 Z" fill="#ff4d6d"/><circle cx="20" cy="36" r="1.6" fill="#2a1a12"/><circle cx="27" cy="39" r="1.6" fill="#2a1a12"/><circle cx="34" cy="36" r="1.6" fill="#2a1a12"/><path d="M6 22 L48 14" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg>' },
+    { id: 'orbita', file: 'orbita.html', name: 'Órbita', desc: 'Destruye asteroides con tu nave y recoge estrellas.', top: 5200,
+      bg: 'linear-gradient(160deg,#4b2a9a,#070a1f)', svg: '<svg viewBox="0 0 54 54"><path d="M27 10 L32 28 L42 34 L32 34 L27 31 L22 34 L12 34 L22 28 Z" fill="#d9dcff"/><path d="M24 34 L27 46 L30 34 Z" fill="#9ff3ff"/><circle cx="42" cy="12" r="5" fill="#8a7aa8"/><path d="M12 14 l1.5 3 3 .4 -2.2 2 .6 3 -2.9-1.5 -2.9 1.5 .6-3 -2.2-2 3-.4z" fill="#ffd447"/></svg>' }
+  ];
+  const potTotal = (window.ARCADE && window.ARCADE.potTotal) || 252;
+  document.getElementById('pot').textContent = Arcade.fmtEUR(potTotal);
+  if (Arcade.tgUser && Arcade.tgUser.first_name) {
+    document.getElementById('hello').textContent = `Hola, ${Arcade.tgUser.first_name}. Cinco juegos, un bote cada semana. Elige uno y entra en el ranking.`;
+  }
+  // Cuenta atrás hasta el domingo a las 23:59
+  function paintWhen() {
+    const now = new Date(), end = new Date(now);
+    end.setDate(now.getDate() + ((7 - now.getDay()) % 7)); end.setHours(23, 59, 0, 0);
+    if (end < now) end.setDate(end.getDate() + 7);
+    const ms = end - now, d = Math.floor(ms / 864e5), h = Math.floor(ms / 36e5) % 24, m = Math.floor(ms / 6e4) % 60;
+    document.getElementById('when').textContent = `Se reparte en ${d > 0 ? d + ' d ' : ''}${h} h ${m} min`;
+  }
+  paintWhen(); setInterval(paintWhen, 30000);
+
+  const box = document.getElementById('games');
+  GAMES.forEach((g) => {
+    const s = Arcade.loadSave(g.id);
+    const st = Arcade.standing(Arcade.rivals(g.id, g.top), s.best);
+    let me = 'Aún no has jugado esta semana';
+    if (st) me = st.prize > 0 ? `Tu mejor: ${Arcade.fmt(s.best)} · puesto ${st.pos} · <b>${Arcade.fmtEUR(st.prize)}</b>` : `Tu mejor: ${Arcade.fmt(s.best)} · puesto ${st.pos}`;
+    const a = document.createElement('a');
+    a.className = 'game'; a.href = g.file;
+    a.innerHTML = `<div class="art" style="background:${g.bg}">${g.svg}</div><div class="info"><span class="name">${g.name}</span><span class="desc">${g.desc}</span><span class="me">${me}</span></div>`;
+    box.appendChild(a);
+  });
+})();
+</script>
+</body>
+</html>

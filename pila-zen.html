@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Pila Zen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Antique&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+<style>
+/* Layout: torre isométrica a pantalla completa sobre un cielo de atardecer; interfaz común encima */
+:root {
+  --bg: #f3dccd;
+  --ink: #2b2140;
+  --muted: #6f6280;
+  --panel: rgba(255, 250, 245, 0.9);
+  --line: rgba(43, 33, 64, 0.16);
+  --accent: #d23f5f;
+  --onaccent: #fff6f2;
+  --gold: #b97a10;
+  --ongold: #2b1a00;
+  --goldline: rgba(185, 122, 16, 0.4);
+  --goldtint: rgba(255, 196, 92, 0.16);
+  --veil: rgba(243, 220, 205, 0.35);
+  --shadow: rgba(140, 60, 80, 0.25);
+  --display: "Zen Antique", "Georgia", serif;
+  --body: "Zen Kaku Gothic New", "Hiragino Sans", system-ui, sans-serif;
+  color-scheme: light;
+}
+#app { background: linear-gradient(180deg, #ffd9c2 0%, #f6c6c9 45%, #c9b6e4 100%); }
+#app .sh-btn.ad { background: #f2b33d; }
+</style>
+</head>
+<body>
+<div id="app"><canvas id="c" aria-label="Juego Pila Zen"></canvas></div>
+<script src="config.js"></script>
+<script src="vendor/three.min.js"></script>
+<script src="comun.js"></script>
+<script>
+(() => {
+  'use strict';
+  const canvas = document.getElementById('c');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setClearColor(0x000000, 0);
+  const scene = new THREE.Scene();
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
+  let viewH = 13;
+  function resize() {
+    const w = canvas.clientWidth || innerWidth, h = canvas.clientHeight || innerHeight;
+    renderer.setSize(w, h, false);
+    const a = w / h; viewH = Math.max(12, 11.5 / a);
+    camera.left = -viewH * a / 2; camera.right = viewH * a / 2; camera.top = viewH / 2; camera.bottom = -viewH / 2;
+    camera.updateProjectionMatrix();
+  }
+  addEventListener('resize', resize);
+  scene.add(new THREE.HemisphereLight(0xfff1e6, 0x9d84c9, 0.85));
+  const dl = new THREE.DirectionalLight(0xffffff, 0.75); dl.position.set(6, 12, 4); scene.add(dl);
+
+  // Pedestal de piedra y torii al fondo
+  const stoneMat = new THREE.MeshLambertMaterial({ color: 0x8e8199 });
+  const pedestal = new THREE.Mesh(new THREE.BoxGeometry(3.6, 6, 3.6), stoneMat); pedestal.position.y = -3.25; scene.add(pedestal);
+  const torii = new THREE.Group();
+  const red = new THREE.MeshLambertMaterial({ color: 0xd23f5f });
+  const dark = new THREE.MeshLambertMaterial({ color: 0x3a2740 });
+  [-2.6, 2.6].forEach((x) => { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 24, 12), red); p.position.set(x, -9, 0); torii.add(p); });
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(7.6, 0.5, 0.6), dark); beam.position.y = 3.2; torii.add(beam);
+  const beam2 = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.35, 0.45), red); beam2.position.y = 2.2; torii.add(beam2);
+  torii.position.set(-9, 0, -9); torii.rotation.y = Math.PI / 4; scene.add(torii);
+
+  // Pétalos
+  const petalMat = new THREE.MeshBasicMaterial({ color: 0xff9fb8, side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
+  const petalGeo = new THREE.CircleGeometry(0.11, 6); petalGeo.scale(1.6, 1, 1);
+  const petals = [];
+  for (let i = 0; i < 46; i++) {
+    const p = new THREE.Mesh(petalGeo, petalMat);
+    p.userData = { ox: Math.random() * 20 - 10, oz: Math.random() * 20 - 10, y: Math.random() * 16, s: 0.6 + Math.random() * 0.8, ph: Math.random() * 6 };
+    petals.push(p); scene.add(p);
+  }
+
+  const H = 0.55, BASE = 3, RANGE = 4.6;
+  let layers = [], falling = [], ripples = [];
+  let moving = null, dir = 1, axis = 'x', speed = 3.4, combo = 0, camY = 0, hueBase = Math.random() * 360;
+  const colorFor = (i) => new THREE.Color().setHSL(((hueBase + i * 7) % 360) / 360, 0.55, 0.66);
+
+  function makeBlock(w, d, i) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(1, H, 1), new THREE.MeshLambertMaterial({ color: colorFor(i) }));
+    m.scale.set(w, 1, d); scene.add(m); return m;
+  }
+  function clearAll() {
+    [...layers, ...falling].forEach((l) => { const m = l.mesh || l; scene.remove(m); m.geometry.dispose(); m.material.dispose(); });
+    ripples.forEach((r) => scene.remove(r)); ripples = [];
+    layers = []; falling = []; moving = null;
+  }
+  function reset() {
+    clearAll(); combo = 0; speed = 3.4; hueBase = Math.random() * 360;
+    const m = makeBlock(BASE, BASE, 0); m.position.set(0, 0, 0);
+    layers.push({ mesh: m, x: 0, z: 0, w: BASE, d: BASE });
+    nextLayer();
+  }
+  function nextLayer() {
+    const top = layers[layers.length - 1], i = layers.length;
+    axis = i % 2 ? 'x' : 'z';
+    const m = makeBlock(top.w, top.d, i);
+    moving = { mesh: m, x: top.x, z: top.z, w: top.w, d: top.d };
+    moving[axis] = (axis === 'x' ? top.x : top.z) - RANGE; dir = 1;
+    m.position.set(moving.x, i * H, moving.z);
+  }
+  function drop(piece, vx, vz) {
+    piece.userData = { vy: 0, vx, vz, rx: (Math.random() - 0.5) * 3, rz: (Math.random() - 0.5) * 3 };
+    falling.push(piece);
+  }
+  function ripple(y, w, d, x, z) {
+    const r = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, side: THREE.DoubleSide }));
+    r.rotation.x = -Math.PI / 2; r.position.set(x, y - H / 2 + 0.01, z); r.scale.set(w + 0.2, d + 0.2, 1);
+    r.userData = { t: 0, w, d }; ripples.push(r); scene.add(r);
+  }
+
+  function place() {
+    if (!moving || !shell.playing()) return;
+    const top = layers[layers.length - 1];
+    const size = axis === 'x' ? top.w : top.d;
+    const delta = moving[axis] - top[axis];
+    const overlap = size - Math.abs(delta);
+    const y = layers.length * H;
+    if (overlap <= 0) {
+      drop(moving.mesh, axis === 'x' ? Math.sign(delta) * 1.5 : 0, axis === 'z' ? Math.sign(delta) * 1.5 : 0);
+      moving = null; shell.noise(0.3, 0.25, 500); shell.crash(); return;
+    }
+    if (Math.abs(delta) < 0.13) {
+      combo++;
+      moving[axis] = top[axis];
+      if (combo >= 4) { if (axis === 'x') moving.w = Math.min(BASE, moving.w + 0.18); else moving.d = Math.min(BASE, moving.d + 0.18); }
+      shell.coin(1); shell.haptic('medium');
+      shell.tone(392 * Math.pow(2, Math.min(combo, 12) / 12), 392 * Math.pow(2, Math.min(combo, 12) / 12) * 1.01, 0.25, 'triangle', 0.12);
+      ripple(y, moving.w, moving.d, moving.x, moving.z);
+    } else {
+      combo = 0;
+      const newSize = overlap, center = top[axis] + delta / 2;
+      const cutSize = Math.abs(delta), cutCenter = center + Math.sign(delta) * (newSize / 2 + cutSize / 2);
+      const piece = makeBlock(axis === 'x' ? cutSize : moving.w, axis === 'z' ? cutSize : moving.d, layers.length);
+      piece.position.set(axis === 'x' ? cutCenter : moving.x, y, axis === 'z' ? cutCenter : moving.z);
+      drop(piece, axis === 'x' ? Math.sign(delta) * 1.2 : 0, axis === 'z' ? Math.sign(delta) * 1.2 : 0);
+      if (axis === 'x') moving.w = newSize; else moving.d = newSize;
+      moving[axis] = center;
+      shell.tone(300, 260, 0.12, 'sine', 0.1); shell.haptic('light');
+    }
+    moving.mesh.scale.set(moving.w, 1, moving.d);
+    moving.mesh.position.set(moving.x, y, moving.z);
+    layers.push(moving); moving = null;
+    const floors = layers.length - 1;
+    shell.setBase(floors * 10); shell.stat = floors;
+    speed = Math.min(7.5, 3.4 + floors * 0.07);
+    nextLayer();
+  }
+
+  const shell = Arcade.create({
+    id: 'pila', title: ['Pila', 'Zen'], bg: '#f3dccd',
+    tagline: 'Apila bloques en el templo. Cuanto más alto, más puntos.',
+    how: ['<b>Toca la pantalla</b> para soltar el bloque que se mueve.', 'Lo que sobresale se corta y cae, y el siguiente bloque será más pequeño.', 'Si lo sueltas <b>justo encima</b> no pierdes nada y ganas una moneda. Cuatro perfectos seguidos hacen crecer el bloque.'],
+    coinValue: 5, rivalTop: 1600, statLabel: 'Pisos', crashTitle: '¡Se ha caído!', reviveLabel: 'Seguir apilando', reviveReward: 'seguir apilando',
+    countdown: false, crashDelay: 900,
+    onStart() { reset(); camY = 0; },
+    onGo() {},
+    onRevive() {
+      const top = layers[layers.length - 1];
+      top.w = Math.max(top.w, 2); top.d = Math.max(top.d, 2); top.mesh.scale.set(top.w, 1, top.d);
+      combo = 0; nextLayer();
+    },
+    onMenu() { reset(); },
+    badges: () => (combo >= 2 ? [`Perfectos x${combo}`] : [])
+  });
+
+  canvas.addEventListener('pointerdown', (e) => { e.preventDefault(); Arcade.audio(); place(); });
+  addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); place(); } });
+
+  let last = performance.now(), clock = 0;
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now; clock += dt;
+    if (moving && (shell.playing() || shell.state === 'menu')) {
+      const top = layers[layers.length - 1], c = axis === 'x' ? top.x : top.z;
+      const sp = shell.state === 'menu' ? 2.2 : speed;
+      moving[axis] += dir * sp * dt;
+      if (moving[axis] > c + RANGE) { moving[axis] = c + RANGE; dir = -1; }
+      if (moving[axis] < c - RANGE) { moving[axis] = c - RANGE; dir = 1; }
+      moving.mesh.position.set(moving.x, layers.length * H, moving.z);
+    }
+    for (let i = falling.length - 1; i >= 0; i--) {
+      const f = falling[i], u = f.userData;
+      u.vy -= 22 * dt; f.position.y += u.vy * dt; f.position.x += u.vx * dt; f.position.z += u.vz * dt;
+      f.rotation.x += u.rx * dt; f.rotation.z += u.rz * dt;
+      if (f.position.y < camY - 20) { scene.remove(f); f.geometry.dispose(); f.material.dispose(); falling.splice(i, 1); }
+    }
+    for (let i = ripples.length - 1; i >= 0; i--) {
+      const r = ripples[i]; r.userData.t += dt; const t = r.userData.t;
+      r.scale.set(r.userData.w + 0.2 + t * 3, r.userData.d + 0.2 + t * 3, 1); r.material.opacity = Math.max(0, 0.8 - t * 1.6);
+      if (t > 0.5) { scene.remove(r); ripples.splice(i, 1); }
+    }
+    const targetY = Math.max(0, (layers.length - 6) * H) + 1.5;
+    camY += (targetY - camY) * Math.min(1, dt * 4);
+    camera.position.set(9, camY + 9, 9); camera.lookAt(0, camY, 0);
+    torii.position.y = camY * 0.6;
+    for (const p of petals) {
+      const u = p.userData; u.y -= dt * 0.9 * u.s;
+      if (u.y < -2) u.y = 16;
+      p.position.set(u.ox + Math.sin(clock * u.s + u.ph) * 1.2, camY + u.y - 6, u.oz);
+      p.rotation.set(clock * u.s + u.ph, clock * 0.7 * u.s, 0);
+    }
+    shell.paintHud();
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+  resize(); reset();
+  requestAnimationFrame(frame);
+  window.__game = { shell, place, aligned() { if (!moving) return false; const t = layers[layers.length - 1]; return Math.abs(moving[axis] - t[axis]) < 0.5; }, get layers() { return layers.length; } };
+})();
+</script>
+</body>
+</html>
