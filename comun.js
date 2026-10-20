@@ -6,9 +6,9 @@
 
   // ---------- Telegram ----------
   const tg = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData ? window.Telegram.WebApp : null;
-  function tgInit(color) {
+  function tgInit(color, keepSwipes) {
     if (!tg) return;
-    try { tg.ready(); tg.expand(); tg.setHeaderColor(color); tg.setBackgroundColor(color); if (tg.disableVerticalSwipes) tg.disableVerticalSwipes(); } catch (e) {}
+    try { tg.ready(); tg.expand(); tg.setHeaderColor(color); tg.setBackgroundColor(color); if (!keepSwipes && tg.disableVerticalSwipes) tg.disableVerticalSwipes(); } catch (e) {}
   }
   const tgUser = tg && tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user : null;
 
