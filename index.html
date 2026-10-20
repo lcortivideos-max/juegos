@@ -52,7 +52,7 @@ h2 { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: v
 <div class="wrap">
   <header>
     <h1 class="brand">Bote <span>Arcade</span></h1>
-    <p class="hello" id="hello">Nueve juegos, un bote cada semana. Elige uno y entra en el ranking.</p>
+    <p class="hello" id="hello">Diez juegos, un bote cada semana. Elige uno y entra en el ranking.</p>
     <div class="pot">
       <span class="lbl">Bote de esta semana</span>
       <span class="amt" id="pot">252,00 €</span>
@@ -89,7 +89,9 @@ h2 { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: v
     { id: 'asteroides', file: 'asteroides.html', name: 'Asteroides', desc: 'El clásico de rocas y naves.', top: 7000,
       bg: 'linear-gradient(160deg,#101418,#000)', svg: '<svg viewBox="0 0 54 54" fill="none" stroke="#bff6ff" stroke-width="2"><path d="M27 18 L33 34 L27 30 L21 34 Z"/><path d="M8 10 L16 8 L20 14 L14 20 L7 17 Z"/><path d="M38 38 L46 36 L49 43 L42 48 L36 45 Z"/></svg>' },
     { id: 'torre', file: 'barriles.html', name: 'La Torre', desc: 'Sube esquivando barriles.', top: 9000,
-      bg: 'linear-gradient(160deg,#ff8a3d,#3b1640)', svg: '<svg viewBox="0 0 54 54"><path d="M6 44 L48 40 M6 30 L48 34 M6 20 L48 16" stroke="#ff4d4d" stroke-width="3"/><path d="M40 16 V34 M44 16 V34" stroke="#ffd166" stroke-width="1.6"/><circle cx="18" cy="26" r="4" fill="#a0522d"/><circle cx="14" cy="38" r="3.4" fill="#ffd166"/></svg>' }
+      bg: 'linear-gradient(160deg,#ff8a3d,#3b1640)', svg: '<svg viewBox="0 0 54 54"><path d="M6 44 L48 40 M6 30 L48 34 M6 20 L48 16" stroke="#ff4d4d" stroke-width="3"/><path d="M40 16 V34 M44 16 V34" stroke="#ffd166" stroke-width="1.6"/><circle cx="18" cy="26" r="4" fill="#a0522d"/><circle cx="14" cy="38" r="3.4" fill="#ffd166"/></svg>' },
+    { id: 'invasores', file: 'invasores.html', name: 'Invasores', desc: 'Detén a los marcianos.', top: 8000,
+      bg: 'linear-gradient(160deg,#0f3d1f,#020a04)', svg: '<svg viewBox="0 0 54 54" fill="#9dffb0"><path d="M15 14h4v3h-4zM35 14h4v3h-4zM19 17h16v3H19zM16 20h22v3H16zM13 23h6v3h-6zM22 23h10v3H22zM35 23h6v3h-6zM13 26h28v3H13zM16 29h4v3h-4zM34 29h4v3h-4z"/><path d="M23 42h8v-3h-8zM19 45h16v3H19z" fill="#3df5ff"/></svg>' }
   ];
   const potTotal = (window.ARCADE && window.ARCADE.potTotal) || 252;
   document.getElementById('pot').textContent = Arcade.fmtEUR(potTotal);
