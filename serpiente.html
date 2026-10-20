@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Serpiente</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Nunito:wght@400;700;800&display=swap">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+<style>
+/* Layout: pantalla de móvil antiguo (LCD verde) enmarcada bajo el marcador; cruceta opcional abajo */
+:root {
+  --bg: #121a17;
+  --ink: #eef6e0;
+  --muted: #9fb48f;
+  --panel: rgba(16, 24, 19, 0.93);
+  --line: rgba(184, 224, 106, 0.24);
+  --accent: #b8e06a;
+  --onaccent: #17200d;
+  --gold: #ffd34d;
+  --ongold: #2b2100;
+  --goldline: rgba(255, 211, 77, 0.42);
+  --goldtint: rgba(255, 211, 77, 0.09);
+  --veil: rgba(8, 12, 9, 0.5);
+  --shadow: rgba(0, 0, 0, 0.5);
+  --display: "Silkscreen", "Courier New", ui-monospace, monospace;
+  --body: "Nunito", "Trebuchet MS", system-ui, sans-serif;
+  color-scheme: dark;
+}
+.sh-logo { letter-spacing: .02em; }
+.sp-chips { position: absolute; z-index: 7; display: flex; gap: 6px; }
+.sp-chip { appearance: none; height: 24px; padding: 0 9px; border-radius: 8px; font: 700 11px/1 var(--body); letter-spacing: .06em; text-transform: uppercase; cursor: pointer;
+  border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.07); color: #c9d4c2; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.sp-chip.on { color: #17200d; background: #b8e06a; border-color: #b8e06a; }
+body.neon .sp-chip { border-color: rgba(120, 240, 255, .35); color: #bff6ff; background: rgba(60, 200, 255, .08); }
+body.neon .sp-chip.on { color: #04131a; background: #5ff0ff; border-color: #5ff0ff; box-shadow: 0 0 10px rgba(95, 240, 255, .6); }
+.sp-opt { display: inline-block; margin: 4px 3px 0; padding: 8px 12px; font-size: 14px; }
+#pad { position: absolute; z-index: 7; width: 174px; height: 174px; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); pointer-events: none; }
+.pk { position: absolute; width: 58px; height: 58px; padding: 0; border-radius: 16px; pointer-events: auto; touch-action: none; cursor: pointer; outline: none; -webkit-tap-highlight-color: transparent;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(#4a525c, #2c3239); border: 1px solid #5d6670; box-shadow: 0 4px 0 #15191d, inset 0 1px 0 rgba(255,255,255,.18); color: #d6dde3; }
+.pk svg { width: 26px; height: 26px; fill: currentColor; }
+.pk.on { transform: translateY(3px); box-shadow: 0 1px 0 #15191d, inset 0 1px 0 rgba(255,255,255,.1); background: linear-gradient(#3b424a, #252a30); }
+body.neon .pk { background: rgba(70, 220, 255, .07); border: 1.5px solid rgba(120, 240, 255, .5); box-shadow: 0 0 12px rgba(95,240,255,.18), inset 0 0 10px rgba(95,240,255,.1); color: #bff6ff; }
+body.neon .pk.on { transform: none; background: rgba(95, 240, 255, .25); box-shadow: 0 0 20px rgba(95,240,255,.55); color: #fff; }
+#kU { left: 58px; top: 0; } #kD { left: 58px; top: 116px; } #kL { left: 0; top: 58px; } #kR { left: 116px; top: 58px; }
+#safe { position: fixed; left: 0; top: 0; width: 0; height: 0; visibility: hidden; pointer-events: none;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
+</style>
+</head>
+<body>
+<div id="app"><canvas id="c" aria-label="Juego Serpiente"></canvas>
+  <div class="sp-chips" id="chips" hidden>
+    <button class="sp-chip" id="chipMode" aria-label="Cambiar estilo de pantalla">Retro</button>
+    <button class="sp-chip" id="chipPad" aria-label="Mostrar u ocultar la cruceta">Cruceta</button>
+  </div>
+  <div id="pad" hidden>
+    <button class="pk" id="kU" tabindex="-1" aria-label="Arriba"><svg viewBox="0 0 24 24"><path d="M12 5 L20 17 H4 Z"/></svg></button>
+    <button class="pk" id="kL" tabindex="-1" aria-label="Izquierda"><svg viewBox="0 0 24 24"><path d="M5 12 L17 4 V20 Z"/></svg></button>
+    <button class="pk" id="kR" tabindex="-1" aria-label="Derecha"><svg viewBox="0 0 24 24"><path d="M19 12 L7 4 V20 Z"/></svg></button>
+    <button class="pk" id="kD" tabindex="-1" aria-label="Abajo"><svg viewBox="0 0 24 24"><path d="M12 19 L20 7 H4 Z"/></svg></button>
+  </div>
+  <div id="safe"></div>
+</div>
+<script src="config.js"></script>
+<script src="comun.js"></script>
+<script>
+(() => {
+  'use strict';
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  const TAU = Math.PI * 2;
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const FONT = '"Silkscreen", "Courier New", ui-monospace, monospace';
+  const BODYF = '"Nunito", "Trebuchet MS", system-ui, sans-serif';
+
+  // ---------- Tablero ----------
+  const COLS = 17, ROWS = 23, SROWS = 2; // SROWS: fila de estado dentro de la pantalla
+  const DX = [1, 0, -1, 0], DY = [0, 1, 0, -1];
+  const FOODS_PER_LEVEL = 10, CARRY_MAX = 24;
+  const LAYOUTS = [
+    { name: 'CAMPO ABIERTO', build() {} },
+    { name: 'LA CAJA', build(w) { border(w); } },
+    { name: 'BARRAS', build(w) { border(w); hbar(w, 7, 4, 12); hbar(w, 15, 4, 12); } },
+    { name: 'PUERTAS', build(w) {
+      border(w);
+      for (let x = 7; x <= 9; x++) { w[x] = 0; w[(ROWS - 1) * COLS + x] = 0; }
+      for (let y = 10; y <= 12; y++) { w[y * COLS] = 0; w[y * COLS + COLS - 1] = 0; }
+      hbar(w, 11, 5, 11); vbar(w, 8, 8, 14);
+      for (const [x, y] of [[3, 3], [12, 3], [3, 18], [12, 18]]) { rect(w, x, y, 2, 2); }
+    } },
+    { name: 'HABITACIONES', build(w) {
+      border(w); vbar(w, 8, 1, 21); hbar(w, 11, 1, 15);
+      for (const y of [5, 6, 16, 17]) w[y * COLS + 8] = 0;
+      for (const x of [3, 4, 12, 13]) w[11 * COLS + x] = 0;
+    } },
+    { name: 'ZIGZAG', build(w) { border(w); hbar(w, 6, 1, 11); hbar(w, 11, 5, 15); hbar(w, 16, 1, 11); } }
+  ];
+  function border(w) { for (let x = 0; x < COLS; x++) { w[x] = 1; w[(ROWS - 1) * COLS + x] = 1; } for (let y = 0; y < ROWS; y++) { w[y * COLS] = 1; w[y * COLS + COLS - 1] = 1; } }
+  function hbar(w, y, x0, x1) { for (let x = x0; x <= x1; x++) w[y * COLS + x] = 1; }
+  function vbar(w, x, y0, y1) { for (let y = y0; y <= y1; y++) w[y * COLS + x] = 1; }
+  function rect(w, x, y, ww, hh) { for (let j = 0; j < hh; j++) for (let i = 0; i < ww; i++) w[(y + j) * COLS + x + i] = 1; }
+  const layoutIndex = (lv) => (lv <= LAYOUTS.length ? lv - 1 : 1 + ((lv - LAYOUTS.length - 1) % (LAYOUTS.length - 1)));
+
+  // Bichos (8x4 puntos, dos fotogramas)
+  const CRITTERS = [
+    ['X.XXXX.X', '.XX..XX.', '.XXXXXX.', 'X.X..X.X', '.XXXXXX.', 'X.X..X.X'],
+    ['..XXXX.X', '.X.XXXX.', '.XXXXXX.', '..XXXX.X', '.XXXXXXX', '..XXXX..'],
+    ['X..XX..X', '.XXXXXX.', 'XX.XX.XX', '.X....X.', 'XX.XX.XX', 'X.X..X.X'],
+    ['..XXXX..', '.XXXXXX.', 'XX.XX.XX', '.X.XX.X.', 'XX.XX.XX', 'X..XX..X']
+  ];
+  // Fuente 3x5
+  const GLYPH = {
+    '0': '111101101101111', '1': '010110010010111', '2': '111001111100111', '3': '111001111001111', '4': '101101111001001',
+    '5': '111100111001111', '6': '111100111101111', '7': '111001010010010', '8': '111101111101111', '9': '111101111001111',
+    'N': '101111111111101', 'I': '111010010010111', 'V': '101101101101010', 'E': '111100110100111', 'L': '100100100100111',
+    '/': '001001010100100', '+': '000010111010000', ' ': '000000000000000', 'x': '000101010101000'
+  };
+
+  // ---------- Estado ----------
+  let W = 0, H = 0, DPR = 1, ts = 16, dot = 4, bx = 0, by = 0, fx = 0, fy = 0, fw = 0, fh = 0, safe = { t: 0, r: 0, b: 0, l: 0 };
+  const STRIP = 32, BEZ = 10, LPAD = 6;
+  let walls = new Uint8Array(COLS * ROWS), wrapEdges = true;
+  let snake = [], dir = 0, queue = [], pending = 0, bulges = [], prevTail = null, acc = 0;
+  let food = null, critter = null, foodsLevel = 0, foodsSinceCritter = 0, level = 1, maxLen = 0;
+  let phase = 'play', phaseT = 0, invuln = 0, dead = false, deadT = 0, attract = true, hintT = 0, t = 0;
+  let particles = [], popups = [], shake = 0, ticks = 0;
+  let mode = 'retro', padOn = false;
+  try { const p = JSON.parse(localStorage.getItem('serpiente_prefs') || '{}'); if (p.mode === 'neon') mode = 'neon'; padOn = !!p.pad; } catch (e) {}
+  const savePrefs = () => { try { localStorage.setItem('serpiente_prefs', JSON.stringify({ mode, pad: padOn })); } catch (e) {} };
+
+  const wall = (x, y) => walls[y * COLS + x] === 1;
+  const wrapX = (x) => (x + COLS) % COLS, wrapY = (y) => (y + ROWS) % ROWS;
+  const onSnake = (x, y, skipTail) => { const n = snake.length - (skipTail ? 1 : 0); for (let i = 0; i < n; i++) if (snake[i].x === x && snake[i].y === y) return true; return false; };
+  const totalLen = () => snake.length + pending;
+  function stepInterval() {
+    const lv = Math.min(level - 1, 10);
+    return Math.max(0.06, 0.165 - 0.0021 * (totalLen() - 4) - 0.007 * lv);
+  }
+
+  function loadLevel(lv) {
+    walls = new Uint8Array(COLS * ROWS);
+    const L = LAYOUTS[layoutIndex(lv)]; L.build(walls);
+    wrapEdges = layoutIndex(lv) === 0;
+    layersDirty = true;
+  }
+  function cellFree(x, y) { return !wall(x, y) && !(food && food.x === x && food.y === y) && !(critter && critter.y === y && (critter.x === x || critter.x + 1 === x)); }
+
+  // Busca un sitio libre con camino despejado por delante
+  function safeSpawn(len) {
+    let best = null, bestScore = -1;
+    for (let y = 1; y < ROWS - 1; y++) for (let x = 1; x < COLS - 1; x++) for (let d = 0; d < 4; d++) {
+      let ok = true;
+      for (let k = 0; k < Math.min(3, len); k++) { const cx = wrapX(x - DX[d] * k), cy = wrapY(y - DY[d] * k); if (!cellFree(cx, cy)) { ok = false; break; } }
+      if (!ok) continue;
+      let run = 0;
+      for (let k = 1; k <= 9; k++) { const cx = wrapX(x + DX[d] * k), cy = wrapY(y + DY[d] * k); if (wall(cx, cy)) break; run++; }
+      const centre = -Math.hypot(x - COLS / 2, y - ROWS / 2) * 0.15;
+      const s = run + centre + Math.random() * 1.5;
+      if (s > bestScore) { bestScore = s; best = { x, y, d }; }
+    }
+    return best || { x: 8, y: 11, d: 3 };
+  }
+  function placeSnake(len) {
+    const sp = safeSpawn(len), n = Math.min(3, len);
+    snake = []; for (let k = 0; k < n; k++) snake.push({ x: wrapX(sp.x - DX[sp.d] * k), y: wrapY(sp.y - DY[sp.d] * k) });
+    dir = sp.d; pending = len - n; queue = []; bulges = []; prevTail = null; acc = 0;
+  }
+  function placeFood() {
+    const free = [];
+    const h = snake[0];
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+      if (wall(x, y) || onSnake(x, y)) continue;
+      if (critter && critter.y === y && (critter.x === x || critter.x + 1 === x)) continue;
+      if (h && Math.abs(h.x - x) + Math.abs(h.y - y) < 2) continue;
+      free.push({ x, y });
+    }
+    food = free.length ? free[(Math.random() * free.length) | 0] : null;
+    if (food) food.born = t;
+  }
+  function spawnCritter() {
+    const opts = [];
+    for (let y = 1; y < ROWS - 1; y++) for (let x = 1; x < COLS - 2; x++) {
+      if (wall(x, y) || wall(x + 1, y) || onSnake(x, y) || onSnake(x + 1, y)) continue;
+      if (food && food.y === y && (food.x === x || food.x === x + 1)) continue;
+      const h = snake[0]; if (h && Math.abs(h.x - x) + Math.abs(h.y - y) < 4) continue;
+      opts.push({ x, y });
+    }
+    if (!opts.length) return;
+    const o = opts[(Math.random() * opts.length) | 0];
+    const max = Math.max(4.5, 8 - 0.35 * (level - 1));
+    critter = { x: o.x, y: o.y, t: max, max, kind: (Math.random() * CRITTERS.length) | 0, born: t };
+    foodsSinceCritter = 0;
+    if (!attract) { [660, 990, 1320].forEach((f, i) => shell.tone(f, f, 0.06, 'square', 0.03, i * 0.05)); }
+  }
+
+  function newGame() {
+    level = 1; foodsLevel = 0; foodsSinceCritter = 0; critter = null; food = null; particles = []; popups = [];
+    loadLevel(1); placeSnake(4); placeFood();
+    maxLen = totalLen(); phase = 'play'; invuln = 0; dead = false; hintT = 4; ticks = 0;
+  }
+  function startAttract() {
+    attract = true; level = 1; loadLevel(1); critter = null; food = null; placeSnake(5); placeFood();
+    phase = 'play'; invuln = 0; dead = false; particles = []; popups = [];
+  }
+
+  // ---------- Reglas ----------
+  function enqueue(d) {
+    if (attract || dead) return;
+    const last = queue.length ? queue[queue.length - 1] : dir;
+    if (d === last || d === (last + 2) % 4) return;
+    if (queue.length < 2) { queue.push(d); if (shell.playing()) shell.tone(1500, 1400, 0.018, 'square', 0.012); }
+  }
+  function burst(x, y, color, n, spd, life) {
+    for (let i = 0; i < n; i++) {
+      const a = rand(0, TAU), v = rand(0.3, 1) * (spd || 6);
+      particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: rand(0.3, life || 0.8), color });
+    }
+  }
+  function popup(x, y, text, color) { popups.push({ x, y, text, color: color || '#fff', life: 1 }); }
+
+  function tick() {
+    ticks++;
+    if (attract) dir = aiDir();
+    else if (queue.length) { const d = queue.shift(); if (d !== (dir + 2) % 4) dir = d; }
+    const h = snake[0];
+    let nx = wrapX(h.x + DX[dir]), ny = wrapY(h.y + DY[dir]);
+    if ((invuln > 0 || attract) && wall(nx, ny)) {
+      for (const d of [(dir + 1) % 4, (dir + 3) % 4]) {
+        const ax = wrapX(h.x + DX[d]), ay = wrapY(h.y + DY[d]);
+        if (!wall(ax, ay) && (invuln > 0 || !onSnake(ax, ay, pending === 0))) { dir = d; nx = ax; ny = ay; break; }
+      }
+    }
+    const hitWall = wall(nx, ny), hitSelf = onSnake(nx, ny, pending === 0);
+    if (hitWall || (hitSelf && invuln <= 0)) {
+      if (attract) { burst(h.x + 0.5, h.y + 0.5, '#b8ff7a', 14, 6); startAttract(); return; }
+      die(nx, ny); return;
+    }
+    snake.unshift({ x: nx, y: ny });
+    if (pending > 0) { pending--; prevTail = null; } else prevTail = snake.pop();
+    for (let i = 0; i < bulges.length; i++) bulges[i]++;
+    bulges = bulges.filter((b) => b < snake.length);
+    if (food && food.x === nx && food.y === ny) eatFood();
+    if (critter && critter.y === ny && (critter.x === nx || critter.x + 1 === nx)) eatCritter();
+    if (!attract) { maxLen = Math.max(maxLen, snake.length); shell.stat = maxLen; }
+  }
+  function eatFood() {
+    const f = food; pending += 1; bulges.push(0);
+    burst(f.x + 0.5, f.y + 0.5, '#ff7ad9', 10, 6, 0.6);
+    foodsLevel++; foodsSinceCritter++;
+    if (attract) { placeFood(); if (!critter && foodsSinceCritter >= 4) spawnCritter(); if (snake.length > 40) startAttract(); return; }
+    const pts = 10 + 5 * (level - 1);
+    shell.addBase(pts); popup(f.x + 0.5, f.y + 0.5, '+' + pts, '#ffffff');
+    const n = foodsLevel % 4;
+    shell.tone(880 + n * 110, 1320 + n * 140, 0.05, 'square', 0.04); shell.tone(1760 + n * 220, 1760 + n * 220, 0.04, 'square', 0.02, 0.045);
+    shell.haptic('light'); shake = Math.max(shake, 0.06);
+    if (foodsLevel >= FOODS_PER_LEVEL) { food = null; levelClear(); return; }
+    placeFood();
+    if (!critter && (foodsSinceCritter >= 6 || (foodsSinceCritter >= 3 && Math.random() < 0.35))) spawnCritter();
+  }
+  function eatCritter() {
+    const c = critter; critter = null;
+    burst(c.x + 1, c.y + 0.5, '#ffe36a', 22, 8, 0.9); burst(c.x + 1, c.y + 0.5, '#ffffff', 8, 5, 0.6);
+    pending += 2; bulges.push(0);
+    if (attract) return;
+    const bonus = Math.round(c.t / c.max * 50 / 5) * 5;
+    shell.coin(1); shell.addBase(bonus);
+    popup(c.x + 1, c.y + 0.5, '+' + (30 * shell.mult + bonus), '#ffe36a');
+    [784, 1047, 1319, 1568, 2093].forEach((f, i) => shell.tone(f, f * 1.02, 0.07, 'square', 0.035, i * 0.045));
+    shell.haptic('medium'); shake = Math.max(shake, 0.14);
+  }
+  function die(nx, ny) {
+    dead = true; deadT = 0; shake = 0.4; queue = [];
+    const h = snake[0];
+    burst(h.x + 0.5 + DX[dir] * 0.5, h.y + 0.5 + DY[dir] * 0.5, mode === 'retro' ? '#000' : '#9dff6a', 26, 9, 0.9);
+    shell.tone(620, 70, 0.6, 'square', 0.06); shell.tone(310, 40, 0.7, 'sawtooth', 0.04, 0.05); shell.noise(0.3, 0.22, 1200);
+    shell.crash();
+  }
+  function levelClear() {
+    phase = 'clear'; phaseT = 1.9; critter = null;
+    const bonus = 50 * level; shell.addBase(bonus);
+    popup(COLS / 2, ROWS / 2 + 2.2, 'BONUS +' + bonus, '#ffe36a');
+    shell.haptic('success');
+    [523, 659, 784, 659, 784, 1047].forEach((f, i) => shell.tone(f, f, 0.1, 'square', 0.04, i * 0.09));
+  }
+  function nextLevel() {
+    level++; foodsLevel = 0; foodsSinceCritter = 0; critter = null;
+    const carry = Math.min(totalLen(), CARRY_MAX);
+    loadLevel(level); food = null; placeSnake(carry); placeFood();
+    phase = 'ready'; phaseT = 1.3; invuln = 0;
+    shell.tone(392, 392, 0.08, 'square', 0.035); shell.tone(587, 587, 0.12, 'square', 0.035, 0.1);
+  }
+
+  // IA de la demo: BFS hasta la comida esquivando cuerpo
+  function aiDir() {
+    const h = snake[0], target = critter && Math.random() < 0.7 ? critter : food;
+    const block = new Uint8Array(COLS * ROWS);
+    for (let i = 0; i < snake.length - 1; i++) block[snake[i].y * COLS + snake[i].x] = 1;
+    for (let i = 0; i < walls.length; i++) if (walls[i]) block[i] = 1;
+    if (target) {
+      const prev = new Int16Array(COLS * ROWS).fill(-1), s = h.y * COLS + h.x; prev[s] = s;
+      const q = [s];
+      for (let i = 0; i < q.length; i++) {
+        const k = q[i], x = k % COLS, y = (k / COLS) | 0;
+        const hit = target.y === y && (target.x === x || (target === critter && target.x + 1 === x));
+        if (i > 0 && hit) { let c = k; while (prev[c] !== s) c = prev[c]; for (let d = 0; d < 4; d++) if (wrapX(h.x + DX[d]) === c % COLS && wrapY(h.y + DY[d]) === ((c / COLS) | 0)) return d; }
+        for (let d = 0; d < 4; d++) {
+          const nx = wrapX(x + DX[d]), ny = wrapY(y + DY[d]), nk = ny * COLS + nx;
+          if (block[nk] || prev[nk] >= 0) continue; prev[nk] = k; q.push(nk);
+        }
+      }
+    }
+    let best = dir, bs = -1;
+    for (let d = 0; d < 4; d++) {
+      if (d === (dir + 2) % 4) continue;
+      const nx = wrapX(h.x + DX[d]), ny = wrapY(h.y + DY[d]); if (block[ny * COLS + nx]) continue;
+      const seen = new Uint8Array(COLS * ROWS), q = [ny * COLS + nx]; seen[q[0]] = 1;
+      for (let i = 0; i < q.length && q.length < 120; i++) { const x = q[i] % COLS, y = (q[i] / COLS) | 0; for (let e = 0; e < 4; e++) { const k = wrapY(y + DY[e]) * COLS + wrapX(x + DX[e]); if (!block[k] && !seen[k]) { seen[k] = 1; q.push(k); } } }
+      if (q.length > bs) { bs = q.length; best = d; }
+    }
+    return best;
+  }
+
+  // ---------- Shell ----------
+  const shell = Arcade.create({
+    id: 'serpiente', title: ['Serpi', 'ente'], bg: '#121a17',
+    tagline: 'La serpiente de bolsillo de toda la vida: come, crece y no te muerdas la cola.',
+    how: [
+      '<b>Desliza</b> el dedo para girar (se guardan hasta 2 giros seguidos), usa las <b>flechas</b> del teclado o activa la <b>cruceta</b> en pantalla.',
+      'Cada bolita te hace crecer y suma puntos. Cuanto más larga, más rápida. Cada 10 bolitas cambias de nivel y aparece un laberinto nuevo.',
+      'A veces sale un <b>bicho</b> que se escapa en pocos segundos: cázalo antes de que desaparezca para ganar bichos y puntos extra.',
+      'En el nivel 1 puedes cruzar los bordes. Después, cuidado con las paredes y con tu propia cola.',
+      '<button class="sh-ghost sp-opt" id="howMode">Retro</button><button class="sh-ghost sp-opt" id="howPad">Cruceta: no</button>'
+    ],
+    coinLabel: 'Bichos', coinSingular: 'bicho', coinValue: 30, rivalTop: 6000, statLabel: 'Longitud',
+    crashTitle: '¡Te has mordido!', reviveLabel: 'Seguir reptando', reviveReward: 'seguir con media serpiente', countdown: true,
+    onStart() { attract = false; newGame(); shell.stat = maxLen; },
+    onGo() {},
+    onRevive() {
+      const len = Math.max(3, Math.floor(totalLen() / 2));
+      dead = false; critter = null; placeSnake(len); invuln = 2.6; phase = 'play';
+      if (!food || onSnake(food.x, food.y) || wall(food.x, food.y)) placeFood();
+      particles = [];
+    },
+    onMenu() { startAttract(); }
+  });
+
+  // ---------- Controles ----------
+  let sw = null;
+  canvas.addEventListener('pointerdown', (e) => { e.preventDefault(); Arcade.audio(); sw = { x: e.clientX, y: e.clientY, n: 0 }; });
+  addEventListener('pointermove', (e) => {
+    if (!sw) return;
+    const dx = e.clientX - sw.x, dy = e.clientY - sw.y;
+    if (dx * dx + dy * dy < 18 * 18) return;
+    enqueue(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 0 : 2) : (dy > 0 ? 1 : 3));
+    sw = { x: e.clientX, y: e.clientY };
+  });
+  addEventListener('pointerup', () => (sw = null));
+  addEventListener('pointercancel', () => (sw = null));
+  const KEYS = { ArrowRight: 0, ArrowDown: 1, ArrowLeft: 2, ArrowUp: 3, d: 0, s: 1, a: 2, w: 3, D: 0, S: 1, A: 2, W: 3 };
+  addEventListener('keydown', (e) => { if (e.key in KEYS) { e.preventDefault(); if (shell.playing() || shell.state === 'count') enqueue(KEYS[e.key]); } });
+  const pad = document.getElementById('pad'), chips = document.getElementById('chips');
+  [['kR', 0], ['kD', 1], ['kL', 2], ['kU', 3]].forEach(([id, d]) => {
+    const b = document.getElementById(id);
+    b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); Arcade.audio(); b.classList.add('on'); enqueue(d); shell.haptic('light'); });
+    const off = () => b.classList.remove('on');
+    b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); b.addEventListener('pointercancel', off);
+  });
+  function paintPrefs() {
+    document.body.classList.toggle('neon', mode === 'neon');
+    const ml = mode === 'retro' ? 'Retro' : 'Neón';
+    document.getElementById('chipMode').textContent = ml;
+    document.getElementById('howMode').textContent = 'Estilo: ' + ml;
+    document.getElementById('chipPad').classList.toggle('on', padOn);
+    document.getElementById('howPad').textContent = 'Cruceta: ' + (padOn ? 'sí' : 'no');
+  }
+  function toggleMode() { mode = mode === 'retro' ? 'neon' : 'retro'; savePrefs(); paintPrefs(); resize(); shell.tone(mode === 'neon' ? 660 : 440, mode === 'neon' ? 1320 : 220, 0.08, 'square', 0.03); }
+  function togglePad() { padOn = !padOn; savePrefs(); paintPrefs(); resize(); }
+  for (const id of ['chipMode', 'howMode']) document.getElementById(id).addEventListener('click', (e) => { e.stopPropagation(); toggleMode(); });
+  for (const id of ['chipPad', 'howPad']) document.getElementById(id).addEventListener('click', (e) => { e.stopPropagation(); togglePad(); });
+
+  // ---------- Tamaño y capas ----------
+  const probe = document.getElementById('safe');
+  let layersDirty = true, bgLayer = null, wallLayer = null;
+  const DW = COLS * 4, DH = (ROWS + SROWS) * 4;
+  const lit = new Float32Array(DW * DH), tgt = new Uint8Array(DW * DH);
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 3);
+    W = canvas.clientWidth || innerWidth; H = canvas.clientHeight || innerHeight;
+    canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const cs = getComputedStyle(probe);
+    safe = { t: parseFloat(cs.paddingTop) || 0, r: parseFloat(cs.paddingRight) || 0, b: parseFloat(cs.paddingBottom) || 0, l: parseFloat(cs.paddingLeft) || 0 };
+    const side = Math.max(10, safe.l, safe.r);
+    const top = safe.t + 64, bottom = safe.b + 12 + (padOn ? 186 : 0);
+    const raw = Math.min((W - side * 2 - 2 * (BEZ + LPAD)) / COLS, (H - top - bottom - STRIP - BEZ - 2 * LPAD) / (ROWS + SROWS));
+    const dpx = Math.max(2, Math.floor(raw * DPR / 4));
+    dot = dpx / DPR; ts = dot * 4;
+    fw = COLS * ts + 2 * (BEZ + LPAD); fh = (ROWS + SROWS) * ts + 2 * LPAD + STRIP + BEZ;
+    const spare = Math.max(0, H - top - bottom - fh);
+    fx = Math.round((W - fw) / 2 * DPR) / DPR; fy = Math.round((top + spare * 0.3) * DPR) / DPR;
+    bx = Math.round((fx + BEZ + LPAD) * DPR) / DPR; by = Math.round((fy + STRIP + LPAD) * DPR) / DPR;
+    chips.style.right = (W - (fx + fw) + BEZ) + 'px'; chips.style.top = (fy + 4) + 'px';
+    layersDirty = true;
+  }
+  addEventListener('resize', resize);
+  function offscreen(w, h) { const c = document.createElement('canvas'); c.width = Math.ceil(w * DPR); c.height = Math.ceil(h * DPR); const g = c.getContext('2d'); g.setTransform(DPR, 0, 0, DPR, 0, 0); return [c, g]; }
+  function rr(g, x, y, w, h, r) { g.beginPath(); if (g.roundRect) g.roundRect(x, y, w, h, r); else g.rect(x, y, w, h); }
+  const LCD_INK = '#1a2613';
+  const chipsW = () => { const h = chips.hidden; chips.hidden = false; const w = chips.offsetWidth || 150; chips.hidden = h; return w; };
+
+  function buildLayers() {
+    layersDirty = false;
+    const [b, g] = offscreen(W, H);
+    const lx = bx - LPAD, ly = by - LPAD, lw = COLS * ts + LPAD * 2, lh = (ROWS + SROWS) * ts + LPAD * 2;
+    if (mode === 'retro') {
+      const lg = g.createLinearGradient(0, 0, W, H); lg.addColorStop(0, '#1d2a2b'); lg.addColorStop(1, '#0e1414');
+      g.fillStyle = lg; g.fillRect(0, 0, W, H);
+      const rg = g.createRadialGradient(W / 2, fy + fh / 2, 20, W / 2, fy + fh / 2, Math.max(W, H) * 0.75);
+      rg.addColorStop(0, 'rgba(150,190,140,0.10)'); rg.addColorStop(1, 'rgba(0,0,0,0.35)');
+      g.fillStyle = rg; g.fillRect(0, 0, W, H);
+      // textura de plástico
+      for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(255,255,255,${rand(0.01, 0.035)})`; g.fillRect(rand(0, W), rand(0, H), 1, 1); }
+      // carcasa
+      g.save(); g.shadowColor = 'rgba(0,0,0,0.6)'; g.shadowBlur = 24; g.shadowOffsetY = 10;
+      const cg = g.createLinearGradient(0, fy, 0, fy + fh); cg.addColorStop(0, '#3b4550'); cg.addColorStop(1, '#232930');
+      g.fillStyle = cg; rr(g, fx, fy, fw, fh, 18); g.fill(); g.restore();
+      g.strokeStyle = 'rgba(255,255,255,0.14)'; g.lineWidth = 1; rr(g, fx + 0.5, fy + 0.5, fw - 1, fh - 1, 18); g.stroke();
+      // altavoz y marca
+      if (false) { g.fillStyle = '#14181c'; rr(g, fx + fw / 2 - 22, fy + 9, 44, 5, 3); g.fill(); g.fillStyle = 'rgba(255,255,255,0.08)'; rr(g, fx + fw / 2 - 22, fy + 14, 44, 1, 1); g.fill(); }
+      g.font = `700 11px ${FONT}`; g.textBaseline = 'middle'; g.textAlign = 'left'; g.fillStyle = 'rgba(210,222,230,0.55)';
+      if (fw - 2 * BEZ - chipsW() > 104) g.fillText('SERPIENTE', fx + BEZ + 4, fy + STRIP / 2 - 1);
+      // marco interior del LCD
+      g.fillStyle = '#0c0f12'; rr(g, lx - 4, ly - 4, lw + 8, lh + 8, 8); g.fill();
+      const pg = g.createRadialGradient(lx + lw / 2, ly + lh * 0.45, 10, lx + lw / 2, ly + lh / 2, Math.max(lw, lh) * 0.7);
+      pg.addColorStop(0, '#b3c48f'); pg.addColorStop(0.7, '#9fb27e'); pg.addColorStop(1, '#8a9d6c');
+      g.fillStyle = pg; rr(g, lx, ly, lw, lh, 4); g.fill();
+      // rejilla de píxeles apagados
+      g.fillStyle = 'rgba(30,48,20,0.065)';
+      const ps = dot * 0.82;
+      for (let y = 0; y < DH; y++) for (let x = 0; x < DW; x++) g.fillRect(bx + x * dot, by + y * dot, ps, ps);
+      // sombra interior
+      const sg = g.createLinearGradient(0, ly, 0, ly + 14); sg.addColorStop(0, 'rgba(0,0,0,0.22)'); sg.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = sg; g.fillRect(lx, ly, lw, 14);
+    } else {
+      const lg = g.createLinearGradient(0, 0, 0, H); lg.addColorStop(0, '#120634'); lg.addColorStop(0.5, '#08031c'); lg.addColorStop(1, '#100428');
+      g.fillStyle = lg; g.fillRect(0, 0, W, H);
+      const rg = g.createRadialGradient(W / 2, fy + fh / 2, 10, W / 2, fy + fh / 2, Math.max(W, H) * 0.7);
+      rg.addColorStop(0, 'rgba(60,40,200,0.28)'); rg.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = rg; g.fillRect(0, 0, W, H);
+      for (let i = 0; i < 70; i++) { g.fillStyle = `rgba(${150 + (i % 3) * 40},220,255,${rand(0.05, 0.25)})`; g.beginPath(); g.arc(rand(0, W), rand(0, H), rand(0.4, 1.3), 0, TAU); g.fill(); }
+      g.fillStyle = 'rgba(10,6,30,0.85)'; rr(g, fx, fy, fw, fh, 18); g.fill();
+      g.save(); g.shadowColor = '#5ff0ff'; g.shadowBlur = 16; g.strokeStyle = 'rgba(95,240,255,0.75)'; g.lineWidth = 1.5; rr(g, fx + 0.75, fy + 0.75, fw - 1.5, fh - 1.5, 18); g.stroke(); g.restore();
+      g.font = `700 11px ${FONT}`; g.textBaseline = 'middle'; g.textAlign = 'left'; g.fillStyle = 'rgba(160,240,255,0.7)';
+      if (fw - 2 * BEZ - chipsW() > 104) g.fillText('SERPIENTE', fx + BEZ + 4, fy + STRIP / 2 - 1);
+      g.fillStyle = '#05020f'; rr(g, lx, ly, lw, lh, 8); g.fill();
+      g.strokeStyle = 'rgba(120,200,255,0.06)'; g.lineWidth = 1; g.beginPath();
+      for (let x = 0; x <= COLS; x++) { g.moveTo(bx + x * ts + 0.5, by + SROWS * ts); g.lineTo(bx + x * ts + 0.5, by + (ROWS + SROWS) * ts); }
+      for (let y = 0; y <= ROWS; y++) { g.moveTo(bx, by + (y + SROWS) * ts + 0.5); g.lineTo(bx + COLS * ts, by + (y + SROWS) * ts + 0.5); }
+      g.stroke();
+      g.fillStyle = 'rgba(95,240,255,0.25)'; g.fillRect(bx, by + SROWS * ts - 3, COLS * ts, 1);
+    }
+    bgLayer = b;
+    // paredes
+    const [c, w] = offscreen(W, H);
+    if (mode === 'retro') {
+      for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+        if (!wall(x, y)) continue;
+        for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) {
+          const inner = (i === 1 || i === 2) && (j === 1 || j === 2) && ((i + j) % 2 === 1);
+          if (inner) continue;
+          const X = bx + (x * 4 + i) * dot, Y = by + ((y + SROWS) * 4 + j) * dot;
+          w.fillStyle = 'rgba(0,0,0,0.13)'; w.fillRect(X + dot * 0.22, Y + dot * 0.22, dot * 0.82, dot * 0.82);
+          w.fillStyle = LCD_INK; w.globalAlpha = 0.86; w.fillRect(X, Y, dot * 0.82, dot * 0.82); w.globalAlpha = 1;
+        }
+      }
+    } else {
+      const col = ['#ff4fd8', '#3ee0ff', '#ffb43e', '#9dff5a', '#b07bff', '#ff6a6a'][(level - 1) % 6];
+      const shape = (inset) => {
+        w.beginPath();
+        for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+          if (!wall(x, y)) continue;
+          const X = bx + x * ts, Y = by + (y + SROWS) * ts, i = inset * ts, s = ts - 2 * i;
+          w.rect(X + i, Y + i, s, s);
+          if (x + 1 < COLS && wall(x + 1, y)) w.rect(X + ts / 2, Y + i, ts, s);
+          if (y + 1 < ROWS && wall(x, y + 1)) w.rect(X + i, Y + ts / 2, s, ts);
+        }
+      };
+      w.save(); w.shadowColor = col; w.shadowBlur = ts * 0.8; w.fillStyle = col; shape(0.14); w.fill(); w.restore();
+      w.fillStyle = col; shape(0.14); w.fill();
+      w.fillStyle = '#12082c'; shape(0.14 + Math.max(1.5, ts * 0.12) / ts); w.fill();
+    }
+    wallLayer = c;
+  }
+
+  // ---------- Dibujo retro (rejilla de puntos con estela) ----------
+  function plot(x, y) { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < DW && y < DH) tgt[y * DW + x] = 1; }
+  function plotText(str, x, y) {
+    for (const ch of str) { const g = GLYPH[ch] || GLYPH[' ']; for (let j = 0; j < 5; j++) for (let i = 0; i < 3; i++) if (g[j * 3 + i] === '1') plot(x + i, y + j); x += 4; }
+  }
+  const textW = (s) => s.length * 4 - 1;
+  function plotSprite(rows, x, y) { for (let j = 0; j < rows.length; j++) for (let i = 0; i < rows[j].length; i++) if (rows[j][i] === 'X') plot(x + i, y + j); }
+  function linked(a, b) { return b && ((Math.abs(a.x - b.x) + Math.abs(a.y - b.y) === 1) || (a.y === b.y && Math.abs(a.x - b.x) === COLS - 1) || (a.x === b.x && Math.abs(a.y - b.y) === ROWS - 1)); }
+  function sideTo(a, b) { // dirección de a hacia b (con bordes)
+    let dx = b.x - a.x, dy = b.y - a.y;
+    if (dx > 1) dx = -1; else if (dx < -1) dx = 1; if (dy > 1) dy = -1; else if (dy < -1) dy = 1;
+    return dx === 1 ? 0 : dy === 1 ? 1 : dx === -1 ? 2 : 3;
+  }
+  function snakeVisible() {
+    if (dead) return Math.floor(deadT * 6) % 2 === 1 || deadT > 1.6;
+    if (invuln > 0 && !attract) return Math.floor(t * 12) % 2 === 0;
+    return true;
+  }
+  function plotSnake() {
+    const n = snake.length, bset = new Set(bulges);
+    for (let i = 0; i < n; i++) {
+      const s = snake[i], X = s.x * 4, Y = (s.y + SROWS) * 4;
+      const conn = [false, false, false, false];
+      if (i > 0 && linked(s, snake[i - 1])) conn[sideTo(s, snake[i - 1])] = true;
+      if (i < n - 1 && linked(s, snake[i + 1])) conn[sideTo(s, snake[i + 1])] = true;
+      if (i === 0) {
+        // cabeza 3x3 con ojo y boca que se abre si hay comida delante
+        for (let j = 0; j < 4; j++) for (let k = 0; k < 4; k++) if (!((j === 0 || j === 3) && (k === 0 || k === 3))) plot(X + k, Y + j);
+        const fa = food && food.x === wrapX(s.x + DX[dir]) && food.y === wrapY(s.y + DY[dir]);
+        // ojo
+        const EYE = [[2, 1], [2, 2], [1, 1], [1, 1]][dir];
+        tgt[(Y + EYE[1]) * DW + X + EYE[0]] = 0;
+        if (fa) {
+          const M = [[[3, 1], [3, 2]], [[1, 3], [2, 3]], [[0, 1], [0, 2]], [[1, 0], [2, 0]]][dir];
+          for (const [mx, my] of M) tgt[(Y + my) * DW + X + mx] = 0;
+        }
+        continue;
+      }
+      if (bset.has(i)) { for (let j = 0; j < 4; j++) for (let k = 0; k < 4; k++) if (!((j === 0 || j === 3) && (k === 0 || k === 3))) plot(X + k, Y + j); continue; }
+      plot(X + 1, Y + 1); plot(X + 2, Y + 1); plot(X + 1, Y + 2); plot(X + 2, Y + 2);
+      // patrón en zigzag clásico
+      if ((i + s.x + s.y) % 2 === 0) { tgt[(Y + 1) * DW + X + 1] = 0; plot(X + 1, Y + 1); }
+      if (conn[0]) { plot(X + 3, Y + 1); plot(X + 3, Y + 2); }
+      if (conn[2]) { plot(X, Y + 1); plot(X, Y + 2); }
+      if (conn[1]) { plot(X + 1, Y + 3); plot(X + 2, Y + 3); }
+      if (conn[3]) { plot(X + 1, Y); plot(X + 2, Y); }
+    }
+  }
+  function plotStatus() {
+    const lv = 'NIVEL ' + level; plotText(lv, 1, 1);
+    const prog = foodsLevel + '/' + FOODS_PER_LEVEL; plotText(prog, DW - 1 - textW(prog), 1);
+    if (critter) {
+      const fr = Math.floor(t * 4) % 2;
+      const spr = CRITTERS[critter.kind]; const rows = fr ? [spr[0], spr[1], spr[4], spr[5]] : spr.slice(0, 4);
+      const cx = Math.round(DW / 2) - 10; plotSprite(rows, cx, 2);
+      plotText(String(Math.ceil(critter.t)), cx + 11, 1);
+    }
+    for (let x = 0; x < DW; x++) plot(x, 7);
+  }
+  function drawRetro() {
+    tgt.fill(0);
+    if (!attract) plotStatus(); else plotText('DEMO', 1, 1);
+    if (food && Math.floor((t - food.born) * 8) % 2 === 0 || (food && t - food.born > 0.5)) {
+      const X = food.x * 4, Y = (food.y + SROWS) * 4;
+      plot(X + 1, Y); plot(X, Y + 1); plot(X + 2, Y + 1); plot(X + 1, Y + 2);
+      if (Math.floor(t * 2) % 2) plot(X + 1, Y + 1);
+    }
+    if (critter && !(critter.t < 2 && Math.floor(t * 8) % 2 === 0)) {
+      const fr = Math.floor(t * 5) % 2, spr = CRITTERS[critter.kind];
+      plotSprite(fr ? [spr[0], spr[1], spr[4], spr[5]] : spr.slice(0, 4), critter.x * 4, (critter.y + SROWS) * 4);
+    }
+    if (snake.length && snakeVisible()) plotSnake();
+    for (const p of particles) plot(p.x * 4, (p.y + SROWS) * 4);
+    for (const p of popups) { const s = p.text.replace('BONUS ', ''); plotText(s, p.x * 4 - textW(s) / 2, (p.y + SROWS) * 4 - 6 - (1 - p.life) * 6); }
+    // estela tipo LCD
+    const step = Math.min(1, 1 / 60 * 22), decay = 1 / 60 * 5.5;
+    for (let i = 0; i < lit.length; i++) lit[i] = tgt[i] ? Math.min(1, lit[i] + step * 2) : Math.max(0, lit[i] - decay);
+    ctx.fillStyle = 'rgba(0,0,0,0.14)';
+    const ps = dot * 0.82, so = dot * 0.22;
+    for (let y = 0; y < DH; y++) for (let x = 0; x < DW; x++) { const v = lit[y * DW + x]; if (v > 0.03) { ctx.globalAlpha = v; ctx.fillRect(bx + x * dot + so, by + y * dot + so, ps, ps); } }
+    ctx.fillStyle = LCD_INK;
+    for (let y = 0; y < DH; y++) for (let x = 0; x < DW; x++) { const v = lit[y * DW + x]; if (v > 0.03) { ctx.globalAlpha = v * 0.9; ctx.fillRect(bx + x * dot, by + y * dot, ps, ps); } }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- Dibujo neón ----------
+  const CX = (x) => bx + (x + 0.5) * ts, CY = (y) => by + (y + SROWS + 0.5) * ts;
+  function drawNeonSnake(a) {
+    if (!snake.length || !snakeVisible()) return;
+    const n = snake.length, pts = [];
+    const h = snake[0];
+    let hd = dir;
+    if (n > 1 && linked(snake[1], h)) hd = sideTo(snake[1], h);
+    pts.push({ x: h.x - DX[hd] * (1 - a), y: h.y - DY[hd] * (1 - a), brk: false });
+    for (let i = 1; i < n; i++) {
+      const pv = snake[i - 1], c = snake[i], adj = Math.abs(pv.x - c.x) + Math.abs(pv.y - c.y) === 1;
+      if (!adj && linked(pv, c)) { // cruza el borde: tramos hasta fuera del tablero
+        const d = sideTo(pv, c);
+        pts.push({ x: pv.x + DX[d], y: pv.y + DY[d], brk: false });
+        pts.push({ x: c.x - DX[d], y: c.y - DY[d], brk: true });
+        pts.push({ x: c.x, y: c.y, brk: false });
+      } else pts.push({ x: c.x, y: c.y, brk: !adj });
+    }
+    if (prevTail && linked(snake[n - 1], prevTail)) {
+      const tl = snake[n - 1];
+      let dx = prevTail.x - tl.x, dy = prevTail.y - tl.y; if (Math.abs(dx) > 1) dx = -Math.sign(dx); if (Math.abs(dy) > 1) dy = -Math.sign(dy);
+      pts.push({ x: tl.x + dx * (1 - a), y: tl.y + dy * (1 - a), brk: false });
+    }
+    ctx.save();
+    ctx.beginPath(); ctx.rect(bx, by + SROWS * ts, COLS * ts, ROWS * ts); ctx.clip();
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const path = () => { ctx.beginPath(); pts.forEach((p, i) => { if (i === 0 || p.brk) ctx.moveTo(CX(p.x), CY(p.y)); else ctx.lineTo(CX(p.x), CY(p.y)); }); };
+    const grad = ctx.createLinearGradient(CX(pts[0].x), CY(pts[0].y), CX(pts[pts.length - 1].x), CY(pts[pts.length - 1].y));
+    grad.addColorStop(0, '#d6ff6a'); grad.addColorStop(1, '#2ee8c8');
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = 'rgba(120,255,160,0.18)'; ctx.lineWidth = ts * 1.25; path(); ctx.stroke();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.shadowColor = '#7dff9a'; ctx.shadowBlur = ts * 0.6;
+    ctx.strokeStyle = grad; ctx.lineWidth = ts * 0.72; path(); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = ts * 0.18; path(); ctx.stroke();
+    // bultos de lo que se ha tragado
+    ctx.fillStyle = '#eaff9a';
+    for (const b of bulges) { const s = snake[b]; if (!s) continue; ctx.beginPath(); ctx.arc(CX(s.x), CY(s.y), ts * 0.42, 0, TAU); ctx.fill(); }
+    // cabeza
+    const hx = CX(pts[0].x), hy = CY(pts[0].y);
+    ctx.fillStyle = '#e8ff8a'; ctx.shadowColor = '#c8ff5a'; ctx.shadowBlur = ts * 0.8; ctx.beginPath(); ctx.arc(hx, hy, ts * 0.46, 0, TAU); ctx.fill(); ctx.shadowBlur = 0;
+    const px = -DY[dir], py = DX[dir];
+    for (const s of [-1, 1]) {
+      const ex = hx + DX[dir] * ts * 0.12 + px * s * ts * 0.2, ey = hy + DY[dir] * ts * 0.12 + py * s * ts * 0.2;
+      ctx.fillStyle = '#08031c'; ctx.beginPath(); ctx.arc(ex, ey, ts * 0.11, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex + DX[dir] * ts * 0.04, ey + DY[dir] * ts * 0.04, ts * 0.04, 0, TAU); ctx.fill();
+    }
+    if (Math.floor(t * 3) % 3 === 0 && !dead) {
+      ctx.strokeStyle = '#ff4f8a'; ctx.lineWidth = Math.max(1.2, ts * 0.08);
+      const tx = hx + DX[dir] * ts * 0.45, ty = hy + DY[dir] * ts * 0.45;
+      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx + DX[dir] * ts * 0.3, ty + DY[dir] * ts * 0.3); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function drawNeonCritter(rows, x, y, s, col) {
+    ctx.save(); ctx.shadowColor = col; ctx.shadowBlur = s * 3; ctx.fillStyle = col;
+    for (let j = 0; j < rows.length; j++) for (let i = 0; i < rows[j].length; i++) if (rows[j][i] === 'X') { rr(ctx, x + i * s, y + j * s, s * 0.86, s * 0.86, s * 0.25); ctx.fill(); }
+    ctx.restore();
+  }
+  function drawNeon(a) {
+    // estado
+    ctx.textBaseline = 'middle'; const sy = by + ts * 0.85;
+    ctx.font = `700 ${Math.round(ts * 0.8)}px ${FONT}`;
+    ctx.fillStyle = '#9ff6ff'; ctx.textAlign = 'left'; ctx.fillText(attract ? 'DEMO' : 'NIVEL ' + level, bx + 4, sy);
+    if (!attract) {
+      ctx.textAlign = 'right'; ctx.fillStyle = '#ff9ae4'; ctx.fillText(foodsLevel + '/' + FOODS_PER_LEVEL, bx + COLS * ts - 4, sy);
+      if (critter) {
+        const spr = CRITTERS[critter.kind], s = ts * 0.2;
+        drawNeonCritter(spr.slice(0, 4), bx + COLS * ts / 2 - s * 10, sy - s * 2, s, '#ffe36a');
+        ctx.textAlign = 'left'; ctx.fillStyle = '#ffe36a'; ctx.fillText(String(Math.ceil(critter.t)), bx + COLS * ts / 2 + s * 1, sy);
+        const fr = clamp(critter.t / critter.max, 0, 1);
+        ctx.fillStyle = 'rgba(255,227,106,0.25)'; ctx.fillRect(bx + COLS * ts / 2 - s * 10, sy + ts * 0.62, s * 20, 2);
+        ctx.fillStyle = '#ffe36a'; ctx.fillRect(bx + COLS * ts / 2 - s * 10, sy + ts * 0.62, s * 20 * fr, 2);
+      }
+    }
+    if (food) {
+      const x = CX(food.x), y = CY(food.y), k = clamp((t - food.born) * 5, 0, 1), r = ts * 0.3 * (1 + 0.12 * Math.sin(t * 7)) * k;
+      ctx.globalCompositeOperation = 'lighter';
+      const gl = ctx.createRadialGradient(x, y, 0, x, y, ts * 1.3); gl.addColorStop(0, 'rgba(255,80,200,0.5)'); gl.addColorStop(1, 'rgba(255,80,200,0)');
+      ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(x, y, ts * 1.3, 0, TAU); ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+      const bg = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, 0, x, y, r); bg.addColorStop(0, '#fff'); bg.addColorStop(0.45, '#ff6ad5'); bg.addColorStop(1, '#b0157f');
+      ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+    }
+    if (critter && !(critter.t < 2 && Math.floor(t * 8) % 2 === 0)) {
+      const fr = Math.floor(t * 5) % 2, spr = CRITTERS[critter.kind], s = ts / 4;
+      const bob = Math.sin(t * 9) * ts * 0.06;
+      drawNeonCritter(fr ? [spr[0], spr[1], spr[4], spr[5]] : spr.slice(0, 4), bx + critter.x * ts, by + (critter.y + SROWS) * ts + bob, s, '#ffe36a');
+    }
+    drawNeonSnake(a);
+    ctx.globalCompositeOperation = 'lighter';
+    for (const p of particles) { ctx.globalAlpha = clamp(p.life / 0.4, 0, 1); ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(CX(p.x - 0.5), CY(p.y - 0.5), ts * 0.12 * (0.5 + p.life), 0, TAU); ctx.fill(); }
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    ctx.textAlign = 'center';
+    for (const p of popups) {
+      ctx.globalAlpha = clamp(p.life * 1.5, 0, 1); ctx.font = `700 ${Math.round(ts * 0.8)}px ${FONT}`;
+      const x = CX(p.x - 0.5), y = CY(p.y - 0.5) - ts * 0.6 - (1 - p.life) * ts;
+      ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(8,3,28,0.85)'; ctx.strokeText(p.text, x, y); ctx.fillStyle = p.color; ctx.fillText(p.text, x, y);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function banner(txt, sub, y) {
+    const retro = mode === 'retro';
+    ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const fs = Math.round(Math.min(26, ts * 1.4));
+    ctx.font = `700 ${fs}px ${FONT}`;
+    const bw = Math.max(ctx.measureText(txt).width, sub ? ctx.measureText(sub).width * 0.6 : 0) + 30, bh = fs * (sub ? 2.6 : 1.7);
+    const x = bx + COLS * ts / 2;
+    if (retro) { ctx.fillStyle = 'rgba(169,185,140,0.94)'; ctx.fillRect(x - bw / 2, y - bh / 2, bw, bh); ctx.strokeStyle = LCD_INK; ctx.lineWidth = dot; ctx.strokeRect(x - bw / 2 + dot, y - bh / 2 + dot, bw - dot * 2, bh - dot * 2); ctx.fillStyle = LCD_INK; }
+    else { ctx.fillStyle = 'rgba(8,3,28,0.85)'; rr(ctx, x - bw / 2, y - bh / 2, bw, bh, 12); ctx.fill(); ctx.strokeStyle = '#5ff0ff'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.shadowColor = '#5ff0ff'; ctx.shadowBlur = 14; ctx.fillStyle = '#c8fbff'; }
+    ctx.fillText(txt, x, sub ? y - fs * 0.45 : y);
+    if (sub) { ctx.shadowBlur = 0; ctx.font = `700 ${Math.round(fs * 0.5)}px ${FONT}`; ctx.globalAlpha = 0.8; ctx.fillText(sub, x, y + fs * 0.65); }
+    ctx.restore();
+  }
+
+  function draw() {
+    if (layersDirty) buildLayers();
+    ctx.save();
+    if (shake > 0) ctx.translate(Math.round(rand(-1, 1) * shake * 14), Math.round(rand(-1, 1) * shake * 14));
+    ctx.drawImage(bgLayer, 0, 0, W, H);
+    const blink = phase === 'clear' && Math.floor((1.9 - phaseT) * 6) % 2 === 1;
+    if (!blink) ctx.drawImage(wallLayer, 0, 0, W, H);
+    const a = shell.playing() && phase === 'play' && !dead ? clamp(acc / stepInterval(), 0, 1) : 1;
+    if (mode === 'retro') drawRetro(); else drawNeon(a);
+    const midY = by + (SROWS + ROWS / 2) * ts;
+    if (!attract && phase === 'ready') banner('NIVEL ' + level, LAYOUTS[layoutIndex(level)].name, midY);
+    else if (!attract && phase === 'clear') banner('¡NIVEL ' + (level) + ' OK!', null, midY);
+    else if (!attract && hintT > 0 && (shell.state === 'play' || shell.state === 'count') && level === 1) {
+      ctx.globalAlpha = clamp(hintT, 0, 1) * 0.9; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = `800 ${Math.round(Math.min(16, ts * 0.85))}px ${BODYF}`;
+      ctx.fillStyle = mode === 'retro' ? LCD_INK : '#9ff6ff';
+      ctx.fillText(padOn ? 'Usa la cruceta para girar' : 'Desliza para girar', bx + COLS * ts / 2, by + (SROWS + ROWS - 2) * ts);
+      ctx.globalAlpha = 1;
+    }
+    if (mode === 'retro') {
+      // brillo del cristal
+      const lx = bx - LPAD, ly = by - LPAD, lw = COLS * ts + LPAD * 2, lh = (ROWS + SROWS) * ts + LPAD * 2;
+      const gg = ctx.createLinearGradient(lx, ly, lx + lw * 0.6, ly + lh * 0.5);
+      gg.addColorStop(0, 'rgba(255,255,255,0.10)'); gg.addColorStop(0.5, 'rgba(255,255,255,0.02)'); gg.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = gg; ctx.fillRect(lx, ly, lw, lh);
+    }
+    ctx.restore();
+  }
+
+  // ---------- Bucle ----------
+  function update(dt) {
+    t += dt;
+    const st = shell.state;
+    if (st === 'menu') {
+      attract = true;
+      acc += dt; const iv = 0.1; while (acc >= iv) { acc -= iv; tick(); }
+      if (critter) { critter.t -= dt; if (critter.t <= 0) critter = null; }
+    } else if (shell.playing() && !dead) {
+      if (phase === 'clear') { phaseT -= dt; if (phaseT <= 0) nextLevel(); }
+      else if (phase === 'ready') { phaseT -= dt; if (phaseT <= 0) { phase = 'play'; acc = 0; } }
+      else {
+        if (invuln > 0) { invuln -= dt; if (invuln <= 0) shell.tone(990, 990, 0.05, 'square', 0.025); }
+        if (hintT > 0 && ticks > 4) hintT -= dt;
+        if (critter) {
+          critter.t -= dt;
+          if (critter.t <= 0) { burst(critter.x + 1, critter.y + 0.5, mode === 'retro' ? '#000' : '#ffe36a', 10, 4, 0.5); critter = null; shell.tone(440, 160, 0.18, 'square', 0.03); }
+        }
+        acc += dt;
+        let guard = 0;
+        while (acc >= stepInterval() && guard++ < 4 && !dead && phase === 'play') { acc -= stepInterval(); tick(); }
+        if (guard >= 4) acc = 0;
+      }
+    }
+    if (dead) deadT += dt;
+    for (const p of particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 1 - 2.5 * dt; p.vy *= 1 - 2.5 * dt; p.life -= dt; }
+    particles = particles.filter((p) => p.life > 0);
+    for (const p of popups) p.life -= dt * 0.9;
+    popups = popups.filter((p) => p.life > 0);
+    shake = Math.max(0, shake - dt * 1.2);
+  }
+  let last = performance.now(), padShown = null, chipsShown = null;
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    update(dt); draw(); shell.paintHud();
+    const sp = padOn && shell.state === 'play';
+    if (sp !== padShown) { padShown = sp; pad.hidden = !sp; if (!sp) pad.querySelectorAll('.pk').forEach((b) => b.classList.remove('on')); }
+    const sc = shell.state === 'play' || shell.state === 'count';
+    if (sc !== chipsShown) { chipsShown = sc; chips.hidden = !sc; }
+    requestAnimationFrame(frame);
+  }
+  paintPrefs(); resize(); startAttract();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { layersDirty = true; });
+  requestAnimationFrame(frame);
+
+  const DIRN = { right: 0, down: 1, left: 2, up: 3 };
+  window.__game = {
+    shell,
+    setDir(d) { enqueue(typeof d === 'string' ? DIRN[d] : d); },
+    get snake() { return snake; }, get dir() { return dir; }, get queue() { return queue; }, get food() { return food; }, get critter() { return critter; },
+    get level() { return level; }, get phase() { return phase; }, get foodsLevel() { return foodsLevel; }, get invuln() { return invuln; },
+    get mode() { return mode; }, get padOn() { return padOn; }, get length() { return totalLen(); }, get walls() { return walls; },
+    toggleMode, togglePad,
+    foodAhead() { const h = snake[0]; food = { x: wrapX(h.x + DX[dir]), y: wrapY(h.y + DY[dir]), born: t }; },
+    critterAhead() { const h = snake[0]; critter = { x: wrapX(h.x + DX[dir]), y: wrapY(h.y + DY[dir]), t: 6, max: 6, kind: 0, born: t }; if (critter.x >= COLS - 1) critter.x = COLS - 2; },
+    spawnCritter, setFoods(n) { foodsLevel = n; },
+    biteSelf() { pending += 6; for (let i = 0; i < 8; i++) snake.push({ ...snake[snake.length - 1] }); invuln = 0; const h = snake[0]; snake[1] = { x: wrapX(h.x + DX[dir]), y: wrapY(h.y + DY[dir]) }; }
+  };
+})();
+</script>
+</body>
+</html>
