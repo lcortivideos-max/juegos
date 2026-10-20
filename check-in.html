@@ -1,0 +1,850 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Check-In</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Righteous&family=Outfit:wght@400;600;800&display=swap">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+<style>
+/* Layout: calle de ciudad en 3D a pantalla completa; arriba lo que llevas y el progreso hasta el hotel; abajo la tarjeta del trato */
+:root {
+  --bg: #0a0d24;
+  --ink: #f2f0ff;
+  --muted: #a7a3c9;
+  --panel: rgba(14, 16, 42, 0.9);
+  --line: rgba(170, 160, 255, 0.2);
+  --accent: #ff3d8b;
+  --onaccent: #fff4f8;
+  --gold: #ffd166;
+  --ongold: #2b1d00;
+  --goldline: rgba(255, 209, 102, 0.4);
+  --goldtint: rgba(255, 209, 102, 0.1);
+  --veil: rgba(6, 8, 24, 0.45);
+  --shadow: rgba(0, 0, 0, 0.5);
+  --good: #3ddc97;
+  --bad: #ff5a5f;
+  --display: "Righteous", "Arial Rounded MT Bold", system-ui, sans-serif;
+  --body: "Outfit", "Trebuchet MS", system-ui, sans-serif;
+  color-scheme: dark;
+}
+#app { background: #0a0d24; }
+.ci-top { position: absolute; z-index: 5; left: 0; right: 0; top: calc(env(safe-area-inset-top, 0px) + 62px); display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 0 max(14px, env(safe-area-inset-right, 0px)) 0 max(14px, env(safe-area-inset-left, 0px)); pointer-events: none; }
+.ci-bag { display: flex; gap: 6px; }
+.ci-item { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 4px 8px 4px 6px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); transition: opacity .3s, filter .3s; }
+.ci-item .ic { font-size: 15px; line-height: 1; }
+@media (max-width: 440px) { .ci-item .tx { display: none; } .ci-item { padding: 5px 7px; } .ci-item .ic { font-size: 17px; } }
+.ci-item.lost { opacity: .35; filter: grayscale(1); text-decoration: line-through; }
+.ci-item.lost.pop { animation: ciLost .5s ease-out; }
+@keyframes ciLost { 0% { transform: scale(1.25); background: var(--bad); } 100% { transform: scale(1); } }
+.ci-trip { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 0; }
+.ci-trip .city { font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 42vw; }
+.ci-trip .city b { color: var(--ink); }
+.ci-dots { display: flex; gap: 4px; align-items: center; }
+.ci-dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.18); }
+.ci-dots i.ok { background: var(--good); }
+.ci-dots i.ko { background: var(--bad); }
+.ci-dots i.now { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+.ci-dots .h { font-size: 13px; margin-left: 2px; }
+
+.ci-offer { position: absolute; z-index: 7; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 14px); transform: translate(-50%, 0); width: min(440px, calc(100% - 24px)); background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 14px 14px 12px; box-shadow: 0 18px 50px rgba(0,0,0,.5); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); display: flex; flex-direction: column; gap: 10px; transition: transform .25s ease, opacity .25s ease; }
+.ci-offer.off { transform: translate(-50%, 30px); opacity: 0; pointer-events: none; }
+.ci-who { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.ci-who .nm { font-family: var(--display); font-size: 19px; }
+.ci-who .rl { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.ci-say { margin: 0; font-size: 16px; line-height: 1.4; background: rgba(255,255,255,.06); border-radius: 14px; padding: 10px 12px; position: relative; }
+.ci-say::before { content: ""; position: absolute; top: -7px; left: 22px; border: 7px solid transparent; border-top: 0; border-bottom-color: rgba(255,255,255,.06); }
+.ci-timer { height: 5px; border-radius: 3px; background: rgba(255,255,255,.1); overflow: hidden; }
+.ci-timer i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--bad), var(--gold) 40%, var(--good)); transform-origin: left; }
+.ci-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ci-btns button { appearance: none; border: 0; cursor: pointer; font-family: var(--display); font-size: 18px; padding: 14px 10px; border-radius: 14px; transition: transform .08s ease; }
+.ci-btns button:active { transform: scale(.96); }
+.ci-btns .no { background: rgba(255,255,255,.1); color: var(--ink); border: 1px solid var(--line); }
+.ci-btns .yes { background: var(--good); color: #062a1b; }
+.ci-btns button:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+
+.ci-fx { position: absolute; z-index: 8; left: 50%; top: 38%; transform: translate(-50%, -50%); font-family: var(--display); font-size: clamp(28px, 9vw, 42px); text-align: center; pointer-events: none; text-shadow: 0 4px 24px rgba(0,0,0,.6); white-space: nowrap; }
+.ci-fx.show { animation: ciFx 1.3s ease-out forwards; }
+@keyframes ciFx { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.7); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); } 70% { opacity: 1; transform: translate(-50%, -55%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -75%) scale(1); } }
+.ci-why { position: absolute; z-index: 8; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 22px); transform: translateX(-50%); width: min(420px, calc(100% - 32px)); text-align: center; font-size: 14px; line-height: 1.4; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; pointer-events: none; transition: opacity .3s; }
+.ci-coin { position: absolute; z-index: 9; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff6c8, var(--gold) 55%, #b8860b); box-shadow: 0 0 10px rgba(255,209,102,.7); pointer-events: none; }
+
+.ci-hotel { position: absolute; z-index: 9; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding: 16px max(16px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 16px) max(16px, env(safe-area-inset-left, 0px)); background: linear-gradient(180deg, transparent 40%, rgba(6,8,24,.7)); }
+.ci-hcard { width: min(420px, 100%); background: var(--panel); border: 1px solid var(--goldline); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 10px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.5); animation: ciUp .4s ease-out; }
+@keyframes ciUp { from { transform: translateY(30px); opacity: 0; } }
+.ci-hcard .k { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.ci-hcard .room { font-family: var(--display); font-size: 28px; color: var(--gold); line-height: 1.1; }
+.ci-hcard .stars { font-size: 20px; letter-spacing: 4px; color: var(--gold); }
+.ci-hcard p { margin: 0; font-size: 15px; color: var(--muted); line-height: 1.4; }
+.ci-hcard p b { color: var(--ink); }
+.ci-hcard .bonus { font-family: var(--display); font-size: 20px; color: var(--ink); }
+@media (prefers-reduced-motion: reduce) { .ci-fx.show, .ci-hcard, .ci-item.lost.pop { animation-duration: .01s; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="c" aria-label="Juego Check-In: una calle de ciudad de noche"></canvas>
+  <div class="ci-top" id="ciTop" hidden>
+    <div class="ci-bag" id="ciBag"></div>
+    <div class="ci-trip"><span class="city" id="ciCity"></span><div class="ci-dots" id="ciDots"></div></div>
+  </div>
+  <div class="ci-offer off" id="ciOffer" aria-live="polite">
+    <div class="ci-who"><span class="nm" id="ciName"></span><span class="rl" id="ciRole"></span></div>
+    <p class="ci-say" id="ciSay"></p>
+    <div class="ci-timer"><i id="ciTimer"></i></div>
+    <div class="ci-btns"><button class="no" id="ciNo">No, gracias</button><button class="yes" id="ciYes">Aceptar</button></div>
+  </div>
+  <div class="ci-fx" id="ciFx"></div>
+  <div class="ci-why" id="ciWhy" hidden></div>
+  <div class="ci-hotel" id="ciHotel" hidden>
+    <div class="ci-hcard">
+      <span class="k" id="ciHk">Check-in en el hotel</span>
+      <span class="room" id="ciRoom"></span>
+      <span class="stars" id="ciStars"></span>
+      <p id="ciHtext"></p>
+      <span class="bonus" id="ciBonus"></span>
+      <button class="sh-btn" id="ciNext">Siguiente viaje</button>
+    </div>
+  </div>
+</div>
+<script src="config.js"></script>
+<script src="vendor/three.min.js"></script>
+<script src="comun.js"></script>
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const pick = (a) => a[Math.floor(Math.random() * a.length)];
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+
+  // ---------- Viajes ----------
+  const CITIES = [
+    { name: 'Madrid', hotel: 'Hotel Aurora', sky: ['#060a26', '#2a1550', '#ff7a59'], fog: 0x1b1238, rain: false },
+    { name: 'Nueva York', hotel: 'The Grand Liberty', sky: ['#03061a', '#14214f', '#3b7bd6'], fog: 0x10173a, rain: true },
+    { name: 'Tokio', hotel: 'Hotel Sakura Tower', sky: ['#05031a', '#2b0f4a', '#ff3d8b'], fog: 0x1a0d33, rain: true },
+    { name: 'Dubái', hotel: 'Palm Royale', sky: ['#0a0718', '#3a1d3f', '#ffb347'], fog: 0x24142c, rain: false },
+    { name: 'Miami', hotel: 'Ocean Drive Palace', sky: ['#07051f', '#3d0f5c', '#00d1c1'], fog: 0x1c0e3a, rain: false },
+    { name: 'Londres', hotel: 'The Kensington', sky: ['#05080f', '#1c2433', '#6b7f99'], fog: 0x161c26, rain: true },
+    { name: 'París', hotel: 'Hôtel Lumière', sky: ['#080616', '#2b1c46', '#f7a1c4'], fog: 0x1d1530, rain: false }
+  ];
+  const PER_TRIP = 7;
+  const ITEMS = [{ id: 'cartera', ic: '👛', nm: 'Cartera' }, { id: 'movil', ic: '📱', nm: 'Móvil' }, { id: 'maleta', ic: '🧳', nm: 'Maleta' }];
+
+  // ---------- Personajes y tratos ----------
+  const FIRST = ['Lucía', 'Marcos', 'Carmen', 'Javi', 'Sofía', 'Diego', 'Elena', 'Raúl', 'Nora', 'Iván', 'Paula', 'Hugo', 'Marta', 'Óscar', 'Alba', 'Leo', 'Inés', 'Bruno', 'Vera', 'Samuel'];
+  // Cada rol: cómo viste y qué ofrece si es honrado
+  const ROLES = [
+    { rl: 'Taxista', top: 0x1d1d1f, bot: 0x2b2b30, hat: 'cap', hatC: 0xf2c200, prop: 'keys',
+      honest: [['Voy hacia tu hotel. Te acerco un par de calles sin cobrarte, que me pilla de camino.', 8], ['Te ahorro la cuesta: sube y te dejo en la esquina siguiente.', 7]] },
+    { rl: 'Florista', top: 0xd8476b, bot: 0x2f2a3a, hat: null, prop: 'flowers',
+      honest: [['Hoy regalo una flor a cada turista. ¡Bienvenido a la ciudad!', 5], ['Me han sobrado rosas. Llévate una para la habitación.', 5]] },
+    { rl: 'Músico callejero', top: 0x2f6f5e, bot: 0x22252e, hat: 'beanie', hatC: 0xc0392b, prop: 'guitar',
+      honest: [['¿Te gusta? Toma una entrada para mi concierto del viernes, es gratis.', 6], ['Escucha una canción y llévate mi disco de regalo.', 6]] },
+    { rl: 'Repartidora', top: 0xf06a2a, bot: 0x1f2633, hat: 'cap', hatC: 0xf06a2a, prop: 'box',
+      honest: [['El cliente no ha contestado y la pizza se enfría. ¿La quieres?', 7], ['Me sobra un menú del día. Para ti, que se va a tirar.', 7]] },
+    { rl: 'Camarero', top: 0xf4f1ea, bot: 0x111114, hat: null, prop: 'tray',
+      honest: [['Estamos de inauguración: un café gratis para quien pase.', 6], ['Prueba nuestro zumo natural, invita la casa.', 5]] },
+    { rl: 'Guía turística', top: 0x2e86de, bot: 0x2d2d3a, hat: 'cap', hatC: 0x2e86de, prop: 'map',
+      honest: [['Toma un mapa de la ciudad con descuentos en museos.', 6], ['¿Buscas tu hotel? Está recto, dos calles más. Toma este folleto con ofertas.', 7]] },
+    { rl: 'Encuestadora', top: 0x8e44ad, bot: 0x2c2c38, hat: null, prop: 'board',
+      honest: [['Una pregunta rápida sobre turismo y te llevas un vale de 10 monedas.', 10], ['¿Dos minutos para una encuesta? Te damos un vale de regalo.', 9]] },
+    { rl: 'Señora del barrio', top: 0x9b6b43, bot: 0x3b3346, hat: null, prop: 'bag', old: true,
+      honest: [['Ay, gracias por ayudarme con la bolsa. Toma, para que te tomes algo.', 10], ['Hijo, estas galletas las he hecho yo. Coge unas para el viaje.', 6]] },
+    { rl: 'Vendedor de periódicos', top: 0x5d6d7e, bot: 0x2a2f38, hat: 'flat', hatC: 0x4a3b2c, prop: 'paper',
+      honest: [['El periódico de hoy trae un cupón de regalo. Este te lo doy yo.', 6], ['Hoy el diario es gratis por aniversario. ¡Toma!', 5]] }
+  ];
+  // Frases de timador: demasiado buenas para ser verdad
+  const TOO_GOOD = [
+    '¡Un móvil último modelo, nuevo, por solo 5 monedas!',
+    'Has ganado un crucero de lujo. Solo necesito tu cartera un segundo para el sorteo.',
+    'Te doy 500 monedas si me prestas el móvil para una llamada.',
+    'Reloj de oro auténtico, de 3.000 a 10 monedas. ¡Precio de amigo!',
+    'Te cambio tu maleta por 1.000 monedas, ahora mismo.',
+    'Invierte 1 moneda conmigo y mañana tendrás 2.000. Garantizado.',
+    'Eres el visitante un millón. ¡Te llevas un coche! Déjame tu cartera para el papeleo.'
+  ];
+  const HURRY = ['¡Rápido, que se acaba!', '¡Decide ya, solo ahora!', '¡Corre, que viene alguien!', '¡Última oportunidad, ya mismo!', '¡Venga, venga, sin pensarlo!'];
+  const TELL_TEXT = {
+    bueno: 'prometía algo demasiado bueno',
+    prisa: 'te metía prisa',
+    gafas: 'llevaba gafas de sol de noche',
+    mano: 'escondía una mano a la espalda'
+  };
+
+  // ---------- Escena 3D ----------
+  const canvas = $('c');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(52, 1, 0.1, 220);
+  function resize() {
+    const w = canvas.clientWidth || innerWidth, h = canvas.clientHeight || innerHeight;
+    renderer.setSize(w, h, false); camera.aspect = w / h;
+    camera.fov = w / h < 0.7 ? 58 : 50; camera.updateProjectionMatrix();
+  }
+  addEventListener('resize', resize);
+
+  function canvasTex(w, h, draw) {
+    const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h);
+    const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
+  }
+  function skyTex(city) {
+    return canvasTex(16, 512, (g, w, h) => {
+      const gr = g.createLinearGradient(0, 0, 0, h);
+      gr.addColorStop(0, city.sky[0]); gr.addColorStop(0.55, city.sky[1]); gr.addColorStop(0.82, city.sky[2]); gr.addColorStop(1, city.sky[1]);
+      g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    });
+  }
+
+  const hemi = new THREE.HemisphereLight(0x8a90ff, 0x2a1a2f, 0.75); scene.add(hemi);
+  const moon = new THREE.DirectionalLight(0xbfc8ff, 0.45); moon.position.set(-8, 14, 6); scene.add(moon);
+  const warm = new THREE.PointLight(0xffc27a, 1.3, 16, 2); scene.add(warm);
+  const shopLight = new THREE.PointLight(0xff4fa3, 0.9, 12, 2); scene.add(shopLight);
+
+  const world = new THREE.Group(); scene.add(world);
+  const fill = new THREE.PointLight(0xfff0e0, 0.9, 7, 2); scene.add(fill);
+
+  // Calzada, aceras y bordillos
+  const ROAD_W = 7, WALK_X = 3.5 + 1.6;
+  const roadTex = canvasTex(256, 256, (g, w, h) => {
+    g.fillStyle = '#16161d'; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 2200; i++) { g.fillStyle = `rgba(255,255,255,${Math.random() * 0.05})`; g.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
+    g.fillStyle = '#e8e2c8'; g.fillRect(w / 2 - 3, 0, 6, h * 0.55);
+  });
+  roadTex.wrapS = roadTex.wrapT = THREE.RepeatWrapping; roadTex.repeat.set(1, 18);
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(ROAD_W, 240), new THREE.MeshPhongMaterial({ map: roadTex, shininess: 60, specular: 0x333344 }));
+  road.rotation.x = -Math.PI / 2; road.position.z = -100; scene.add(road);
+  const walkTex = canvasTex(256, 256, (g, w, h) => {
+    g.fillStyle = '#4a4757'; g.fillRect(0, 0, w, h);
+    g.strokeStyle = 'rgba(20,18,30,.55)'; g.lineWidth = 3;
+    for (let i = 0; i <= 4; i++) { g.beginPath(); g.moveTo(0, i * 64); g.lineTo(w, i * 64); g.stroke(); g.beginPath(); g.moveTo(i * 64, 0); g.lineTo(i * 64, h); g.stroke(); }
+    for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(255,255,255,${Math.random() * 0.06})`; g.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
+  });
+  walkTex.wrapS = walkTex.wrapT = THREE.RepeatWrapping; walkTex.repeat.set(1.2, 60);
+  [-1, 1].forEach((s) => {
+    const sw = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.18, 240), new THREE.MeshLambertMaterial({ map: walkTex }));
+    sw.position.set(s * (ROAD_W / 2 + 1.8), 0.09, -100); scene.add(sw);
+    const curb = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.2, 240), new THREE.MeshLambertMaterial({ color: 0x8c8899 }));
+    curb.position.set(s * (ROAD_W / 2 + 0.08), 0.1, -100); scene.add(curb);
+  });
+
+  // Fachadas con ventanas encendidas
+  function facadeTex(base, lit) {
+    return canvasTex(128, 256, (g, w, h) => {
+      g.fillStyle = base; g.fillRect(0, 0, w, h);
+      const cols = 4, rows = 8, cw = w / cols, rh = h / rows;
+      for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+        const on = Math.random() < 0.55;
+        g.fillStyle = on ? pick(lit) : 'rgba(10,12,30,.9)';
+        g.fillRect(x * cw + cw * 0.18, y * rh + rh * 0.22, cw * 0.64, rh * 0.56);
+        if (on && Math.random() < 0.4) { g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x * cw + cw * 0.18, y * rh + rh * 0.22, cw * 0.64, rh * 0.18); }
+      }
+    });
+  }
+  const FACADES = [
+    facadeTex('#24223a', ['#ffd89b', '#ffe9c2', '#fff2d9']),
+    facadeTex('#1c2533', ['#9fd8ff', '#d7f0ff', '#ffe2a8']),
+    facadeTex('#2c1f2b', ['#ffb36b', '#ffd27f', '#ffcf9e']),
+    facadeTex('#1e1e26', ['#fff4d6', '#cfe6ff', '#ffd6a5']),
+    facadeTex('#2a2633', ['#ffc8dd', '#ffe5b4', '#e0d4ff'])
+  ];
+  FACADES.forEach((t) => { t.wrapS = t.wrapT = THREE.RepeatWrapping; });
+  function neonTex(text, color) {
+    return canvasTex(256, 96, (g, w, h) => {
+      g.fillStyle = 'rgba(10,8,20,.85)'; g.fillRect(0, 0, w, h);
+      g.font = 'bold 54px Righteous, Arial Rounded MT Bold, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.shadowColor = color; g.shadowBlur = 22; g.fillStyle = color; g.fillText(text, w / 2, h / 2 + 3);
+      g.shadowBlur = 0; g.fillStyle = '#fff'; g.globalAlpha = 0.75; g.fillText(text, w / 2, h / 2 + 3);
+    });
+  }
+  const NEONS = [['BAR', '#ff3d8b'], ['24H', '#3df5ff'], ['PIZZA', '#ffb347'], ['SUSHI', '#ff5a5f'], ['CLUB', '#b26bff'], ['CAFÉ', '#ffd166'], ['TAPAS', '#ff7a59'], ['DISCO', '#3ddc97'], ['FARMACIA', '#3ddc97'], ['RAMEN', '#ff3d8b']]
+    .map(([t, c]) => ({ tex: neonTex(t, c), color: new THREE.Color(c) }));
+  const lampGlow = canvasTex(64, 64, (g, w) => { const r = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2); r.addColorStop(0, 'rgba(255,230,180,1)'); r.addColorStop(0.3, 'rgba(255,200,120,.45)'); r.addColorStop(1, 'rgba(255,180,100,0)'); g.fillStyle = r; g.fillRect(0, 0, w, w); });
+  const poolTex = canvasTex(64, 64, (g, w) => { const r = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2); r.addColorStop(0, 'rgba(255,205,140,.55)'); r.addColorStop(1, 'rgba(255,190,120,0)'); g.fillStyle = r; g.fillRect(0, 0, w, w); });
+
+  const buildings = [], lamps = [], cars = [];
+  const bMats = FACADES.map((t, i) => {
+    const m = new THREE.MeshLambertMaterial({ map: t, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: 0.85, color: [0x9a96b8, 0x8fa3c2, 0xb39a9a, 0x9a9aa6, 0xb0a0b8][i] });
+    return m;
+  });
+  function makeBuilding() {
+    const w = rand(5, 9), d = rand(5, 9), h = rand(9, 34);
+    const geo = new THREE.BoxGeometry(w, h, d);
+    const uv = geo.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * Math.round(w / 2.4), uv.getY(i) * Math.round(h / 5));
+    const g = new THREE.Group();
+    const m = new THREE.Mesh(geo, pick(bMats)); m.position.y = h / 2; g.add(m);
+    // Bajo comercial con escaparate iluminado
+    const shop = new THREE.Mesh(new THREE.BoxGeometry(w * 0.86, 2.6, 0.12), new THREE.MeshPhongMaterial({ color: 0x0b0d18, emissive: new THREE.Color().setHSL(Math.random(), 0.55, 0.1 + Math.random() * 0.08), shininess: 120, specular: 0x8899cc }));
+    shop.position.set(0, 1.5, d / 2 + 0.07); g.add(shop);
+    if (Math.random() < 0.75) {
+      const n = pick(NEONS);
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.98), new THREE.MeshBasicMaterial({ map: n.tex, transparent: true }));
+      sign.position.set(rand(-w * 0.2, w * 0.2), 3.5, d / 2 + 0.15); g.add(sign);
+    }
+    if (Math.random() < 0.3) {
+      const roofSign = new THREE.Mesh(new THREE.BoxGeometry(w * 0.5, 0.3, 0.3), new THREE.MeshBasicMaterial({ color: pick(NEONS).color }));
+      roofSign.position.set(0, h + 0.4, d / 2 - 0.4); g.add(roofSign);
+    }
+    g.userData = { w, d, h };
+    return g;
+  }
+  function placeRow(side) {
+    let z = 12;
+    for (let i = 0; i < 14; i++) {
+      const b = makeBuilding(); const { w, d } = b.userData;
+      b.rotation.y = side < 0 ? Math.PI / 2 : -Math.PI / 2;
+      z -= w / 2;
+      b.position.set(side * (ROAD_W / 2 + 3.6 + d / 2), 0, z);
+      z -= w / 2 + rand(0.3, 1.2);
+      b.userData.side = side; world.add(b); buildings.push(b);
+    }
+  }
+  placeRow(-1); placeRow(1);
+  function rowFront(side) { let m = 0; buildings.forEach((b) => { if (b.userData.side === side) m = Math.min(m, b.position.z - b.userData.w / 2); }); return m; }
+
+  const poleMat = new THREE.MeshLambertMaterial({ color: 0x2a2a33 });
+  for (let i = 0; i < 12; i++) {
+    const side = i % 2 ? 1 : -1, g = new THREE.Group();
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 5.2, 8), poleMat); pole.position.y = 2.6; g.add(pole);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.08, 0.08), poleMat); arm.position.set(-side * 0.6, 5.1, 0); g.add(arm);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.14, 0.3), new THREE.MeshBasicMaterial({ color: 0xffe2b0 })); head.position.set(-side * 1.2, 5.0, 0); g.add(head);
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: lampGlow, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); glow.scale.set(3, 3, 1); glow.position.set(-side * 1.2, 4.9, 0); g.add(glow);
+    const pool = new THREE.Mesh(new THREE.PlaneGeometry(5, 5), new THREE.MeshBasicMaterial({ map: poolTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+    pool.rotation.x = -Math.PI / 2; pool.position.set(-side * 1.2, 0.2, 0); g.add(pool);
+    g.position.set(side * (ROAD_W / 2 + 0.5), 0, 10 - i * 9);
+    world.add(g); lamps.push(g);
+  }
+
+  // Coches que pasan
+  const headTex = canvasTex(64, 64, (g, w) => { const r = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2); r.addColorStop(0, 'rgba(255,255,240,1)'); r.addColorStop(0.35, 'rgba(255,250,220,.5)'); r.addColorStop(1, 'rgba(255,250,220,0)'); g.fillStyle = r; g.fillRect(0, 0, w, w); });
+  const tailTex = canvasTex(64, 64, (g, w) => { const r = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2); r.addColorStop(0, 'rgba(255,60,60,1)'); r.addColorStop(1, 'rgba(255,40,40,0)'); g.fillStyle = r; g.fillRect(0, 0, w, w); });
+  function makeCar() {
+    const g = new THREE.Group(), col = pick([0xf2c200, 0xd63031, 0x2d3436, 0xdfe6e9, 0x0984e3, 0x6c5ce7, 0x00b894]);
+    const paint = new THREE.MeshPhongMaterial({ color: col, shininess: 90, specular: 0x666666 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.6, 4), paint); body.position.y = 0.6; g.add(body);
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.55, 2.1), new THREE.MeshPhongMaterial({ color: 0x111622, shininess: 120, specular: 0x8899aa })); cab.position.set(0, 1.15, -0.2); g.add(cab);
+    const wheelG = new THREE.CylinderGeometry(0.34, 0.34, 0.25, 14); wheelG.rotateZ(Math.PI / 2);
+    const wm = new THREE.MeshLambertMaterial({ color: 0x0b0b0e });
+    [[-0.85, 1.3], [0.85, 1.3], [-0.85, -1.3], [0.85, -1.3]].forEach(([x, z]) => { const w = new THREE.Mesh(wheelG, wm); w.position.set(x, 0.34, z); g.add(w); });
+    [-0.6, 0.6].forEach((x) => {
+      const h = new THREE.Sprite(new THREE.SpriteMaterial({ map: headTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); h.scale.set(1.4, 1.4, 1); h.position.set(x, 0.65, 2.05); g.add(h);
+      const t = new THREE.Sprite(new THREE.SpriteMaterial({ map: tailTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); t.scale.set(0.8, 0.8, 1); t.position.set(x, 0.7, -2.05); g.add(t);
+    });
+    if (col === 0xf2c200) { const sign = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.18, 0.3), new THREE.MeshBasicMaterial({ color: 0xfff3b0 })); sign.position.y = 1.52; g.add(sign); }
+    return g;
+  }
+  for (let i = 0; i < 4; i++) { const c = makeCar(); c.userData = { lane: i % 2 ? 1 : -1, v: rand(9, 16) }; resetCar(c, true); world.add(c); cars.push(c); }
+  function resetCar(c, initial) {
+    const lane = c.userData.lane; c.position.x = lane * 1.75; c.rotation.y = lane > 0 ? Math.PI : 0;
+    c.position.z = lane > 0 ? (initial ? rand(-80, -20) : rand(-130, -90)) : (initial ? rand(-60, 0) : 14);
+    c.userData.v = rand(9, 16);
+  }
+
+  // Lluvia
+  const RAIN_N = 700, rainGeo = new THREE.BufferGeometry(), rainPos = new Float32Array(RAIN_N * 6);
+  for (let i = 0; i < RAIN_N; i++) { const x = rand(-14, 14), y = rand(0, 18), z = rand(-40, 8); rainPos.set([x, y, z, x + 0.03, y - 0.5, z + 0.08], i * 6); }
+  rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
+  const rain = new THREE.LineSegments(rainGeo, new THREE.LineBasicMaterial({ color: 0x9fb4ff, transparent: true, opacity: 0.35 }));
+  scene.add(rain);
+
+  // ---------- Personas ----------
+  const SKINS = [0xf1c7a5, 0xe0ac85, 0xc68a5e, 0x9a6845, 0x6e4a32, 0xf6d5bd];
+  const HAIRS = [0x1b1410, 0x3b2516, 0x6b4423, 0xb8874d, 0x2a2a2a, 0xd8d0c8, 0x8a2e1d];
+  function std(c, s) { return new THREE.MeshPhongMaterial({ color: c, shininess: s || 12 }); }
+  function capsule(r, len, mat, seg) {
+    const g = new THREE.Group();
+    const cyl = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.92, len, seg || 12), mat); g.add(cyl);
+    const top = new THREE.Mesh(new THREE.SphereGeometry(r, seg || 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat); top.position.y = len / 2; g.add(top);
+    const bot = new THREE.Mesh(new THREE.SphereGeometry(r * 0.92, seg || 12, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), mat); bot.position.y = -len / 2; g.add(bot);
+    return g;
+  }
+  // Persona de unos 1,78 m mirando hacia +z
+  function makePerson(o) {
+    const P = new THREE.Group();
+    const skin = std(o.skin, 30), top = std(o.top, 18), bot = std(o.bot, 10), shoe = std(0x15131a, 60), hair = std(o.hair, 25);
+    const legs = [], arms = [];
+    [-1, 1].forEach((s) => {
+      const hip = new THREE.Group(); hip.position.set(s * 0.12, 0.92, 0); P.add(hip);
+      const thigh = capsule(0.085, 0.36, bot); thigh.position.y = -0.22; hip.add(thigh);
+      const knee = new THREE.Group(); knee.position.y = -0.44; hip.add(knee);
+      const shin = capsule(0.072, 0.34, bot); shin.position.y = -0.2; knee.add(shin);
+      const foot = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.26), shoe); foot.position.set(0, -0.43, 0.05); knee.add(foot);
+      hip.userData.knee = knee; legs.push(hip);
+    });
+    const torsoG = new THREE.Group(); torsoG.position.y = 0.92; P.add(torsoG);
+    const pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.18, 14, 10), bot); pelvis.scale.set(1.15, 0.6, 0.8); pelvis.position.y = 0.04; torsoG.add(pelvis);
+    const chest = new THREE.Mesh(new THREE.CylinderGeometry(o.old ? 0.2 : 0.21, 0.17, 0.52, 14), top); chest.scale.z = 0.66; chest.position.y = 0.33; torsoG.add(chest);
+    const shoulders = new THREE.Mesh(new THREE.SphereGeometry(0.21, 14, 10), top); shoulders.scale.set(1.08, 0.5, 0.68); shoulders.position.y = 0.58; torsoG.add(shoulders);
+    if (o.jacket) { const zip = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.5, 0.02), std(0xd0d0d0, 80)); zip.position.set(0, 0.33, 0.15); torsoG.add(zip); }
+    if (o.vest) { const v = new THREE.Mesh(new THREE.CylinderGeometry(0.215, 0.18, 0.4, 14, 1, true), std(o.vest, 20)); v.scale.z = 0.68; v.position.y = 0.36; torsoG.add(v); }
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.06, 0.1, 10), skin); neck.position.y = 0.68; torsoG.add(neck);
+    const headG = new THREE.Group(); headG.position.y = 0.84; torsoG.add(headG);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.115, 20, 16), skin); head.scale.set(0.92, 1.1, 1); headG.add(head);
+    const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.09, 14, 10), skin); jaw.scale.set(0.95, 0.7, 0.95); jaw.position.set(0, -0.06, 0.02); headG.add(jaw);
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.05, 8), skin); nose.rotation.x = Math.PI / 2; nose.position.set(0, -0.005, 0.115); headG.add(nose);
+    [-1, 1].forEach((s) => { const ear = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 6), skin); ear.scale.set(0.5, 1, 0.8); ear.position.set(s * 0.105, 0, 0); headG.add(ear); });
+    const white = new THREE.MeshBasicMaterial({ color: 0xf5f3ee }), iris = new THREE.MeshBasicMaterial({ color: pick([0x3b2416, 0x2b4a6b, 0x3c5a2f, 0x1a1a1a]) }), brow = std(o.hair, 10);
+    [-1, 1].forEach((s) => {
+      const e = new THREE.Mesh(new THREE.SphereGeometry(0.019, 10, 8), white); e.scale.set(1.2, 0.8, 0.5); e.position.set(s * 0.04, 0.025, 0.1); headG.add(e);
+      const p = new THREE.Mesh(new THREE.SphereGeometry(0.011, 8, 6), iris); p.position.set(s * 0.04, 0.025, 0.11); headG.add(p);
+      const b = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.009, 0.01), brow); b.position.set(s * 0.042, 0.055, 0.105); b.rotation.z = s * -0.12; headG.add(b);
+    });
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.008, 0.01), new THREE.MeshBasicMaterial({ color: 0x8a3b3b })); mouth.position.set(0, -0.06, 0.103); headG.add(mouth);
+    // Pelo
+    const style = o.hairStyle || 'short';
+    if (o.old) { const bun = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), hair); bun.position.set(0, 0.09, -0.09); headG.add(bun); }
+    if (style !== 'bald') {
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.122, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.42), hair); cap.scale.set(0.95, 1.12, 1.05); cap.position.y = 0.03; cap.rotation.x = -0.35; headG.add(cap);
+      if (style === 'long') { const back = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.26, 14, 1, true, Math.PI * 0.6, Math.PI * 0.8), hair); back.position.set(0, -0.07, -0.015); headG.add(back); }
+    }
+    if (o.beard) { const bd = new THREE.Mesh(new THREE.SphereGeometry(0.092, 14, 8, -Math.PI * 0.4, Math.PI * 0.8, Math.PI * 0.62, Math.PI * 0.3), hair); bd.position.set(0, -0.03, 0.012); headG.add(bd); }
+    // Sombrero
+    if (o.hat === 'cap') {
+      const c = std(o.hatC, 15);
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(0.126, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.42), c); dome.position.y = 0.06; dome.rotation.x = -0.2; headG.add(dome);
+      const visor = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.012, 16, 1, false, -Math.PI / 2, Math.PI), c); visor.position.set(0, 0.085, 0.09); visor.scale.z = 1.1; visor.rotation.x = 0.12; headG.add(visor);
+    } else if (o.hat === 'beanie') {
+      const b = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.45), std(o.hatC, 8)); b.scale.y = 1.2; b.position.y = 0.05; b.rotation.x = -0.2; headG.add(b);
+    } else if (o.hat === 'flat') {
+      const b = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.13, 0.05, 16), std(o.hatC, 8)); b.position.set(0, 0.1, 0.015); b.rotation.x = 0.12; headG.add(b);
+    }
+    // Gafas
+    let shades = null;
+    if (o.glasses === 'sun') {
+      shades = new THREE.Group();
+      const lens = new THREE.MeshPhongMaterial({ color: 0x000000, shininess: 50, specular: 0x2a2a3a });
+      [-1, 1].forEach((s) => { const l = new THREE.Mesh(new THREE.BoxGeometry(0.064, 0.04, 0.014), lens); l.position.set(s * 0.043, 0.024, 0.118); l.rotation.y = s * 0.25; shades.add(l); const arm = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.008, 0.11), lens); arm.position.set(s * 0.1, 0.03, 0.06); shades.add(arm); });
+      const br = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.01, 0.012), lens); br.position.set(0, 0.034, 0.124); shades.add(br);
+      headG.add(shades);
+    } else if (o.glasses === 'clear') {
+      const fr = std(0x222222, 50);
+      [-1, 1].forEach((s) => { const r = new THREE.Mesh(new THREE.TorusGeometry(0.022, 0.0035, 6, 16), fr); r.position.set(s * 0.041, 0.025, 0.117); headG.add(r); });
+    }
+    // Brazos
+    [-1, 1].forEach((s) => {
+      const sh = new THREE.Group(); sh.position.set(s * 0.25, 0.56, 0); torsoG.add(sh);
+      const up = capsule(0.062, 0.24, top); up.position.y = -0.15; sh.add(up);
+      const el = new THREE.Group(); el.position.y = -0.3; sh.add(el);
+      const fore = capsule(0.052, 0.22, o.shortSleeve ? skin : top); fore.position.y = -0.13; el.add(fore);
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.048, 10, 8), skin); hand.scale.set(0.8, 1.1, 0.6); hand.position.y = -0.29; el.add(hand);
+      sh.rotation.z = s * 0.08; sh.userData = { el, hand, s };
+      arms.push(sh);
+    });
+    P.userData = { legs, arms, torso: torsoG, head: headG, shades };
+    return P;
+  }
+  function addProp(P, kind) {
+    const arm = P.userData.arms[1], hand = arm.userData.hand, el = arm.userData.el;
+    let m = null;
+    if (kind === 'flowers') {
+      m = new THREE.Group();
+      const st = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.26, 10, 1, true), std(0xeedfc8, 8)); st.rotation.x = Math.PI; m.add(st);
+      for (let i = 0; i < 6; i++) { const f = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), std(pick([0xff3d6e, 0xffd166, 0xff7aa8, 0xffffff]), 20)); f.position.set(rand(-0.05, 0.05), 0.14 + rand(0, 0.05), rand(-0.05, 0.05)); m.add(f); }
+      m.position.set(0, -0.28, 0.06);
+    } else if (kind === 'guitar') {
+      m = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), std(0xa0522d, 50)); body.scale.set(1, 1.25, 0.35); m.add(body);
+      const hole = new THREE.Mesh(new THREE.CircleGeometry(0.05, 14), new THREE.MeshBasicMaterial({ color: 0x1a0d05 })); hole.position.z = 0.062; hole.position.y = 0.04; m.add(hole);
+      const neck = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.5, 0.03), std(0x3b2314, 30)); neck.position.y = 0.42; m.add(neck);
+      m.position.set(-0.05, 0.25, 0.2); m.rotation.z = 0.9; P.userData.torso.add(m); return;
+    } else if (kind === 'box') {
+      m = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.06, 0.4), std(0xd9a066, 5)); m.position.set(-0.24, 0.32, 0.26); P.userData.torso.add(m);
+      arm.rotation.x = -1.1; P.userData.arms[0].rotation.x = -1.1; arm.userData.el.rotation.x = -0.4; P.userData.arms[0].userData.el.rotation.x = -0.4; return;
+    } else if (kind === 'tray') {
+      m = new THREE.Group();
+      const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.015, 20), std(0xc0c0c8, 90)); m.add(tr);
+      const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.03, 0.08, 12), std(0xffffff, 60)); cup.position.set(0.05, 0.05, 0); m.add(cup);
+      m.position.set(0, -0.3, 0.12); el.rotation.x = -1.4;
+    } else if (kind === 'map') {
+      m = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.34, 0.01), new THREE.MeshBasicMaterial({ map: canvasTex(64, 80, (g, w, h) => { g.fillStyle = '#f3ecd2'; g.fillRect(0, 0, w, h); g.strokeStyle = '#2e86de'; g.lineWidth = 3; g.beginPath(); g.moveTo(5, 60); g.bezierCurveTo(20, 10, 40, 70, 60, 15); g.stroke(); g.fillStyle = '#ff3d8b'; g.beginPath(); g.arc(44, 40, 5, 0, 7); g.fill(); }) }));
+      m.position.set(0, -0.32, 0.08); el.rotation.x = -1.2;
+    } else if (kind === 'board') {
+      m = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.32, 0.015), std(0x6b4f2a, 10)); m.position.set(0, -0.3, 0.08); el.rotation.x = -1.3;
+    } else if (kind === 'bag') {
+      m = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.28, 0.14), std(0x7d5a8c, 15)); m.position.set(0, -0.42, 0);
+    } else if (kind === 'paper') {
+      m = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.3, 0.04), std(0xe8e4d8, 5)); m.position.set(0, -0.3, 0.06); el.rotation.x = -1.1;
+    } else if (kind === 'keys') {
+      m = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.006, 6, 12), std(0xd4af37, 120)); m.position.set(0, -0.33, 0.02);
+    }
+    if (m) el.add(m);
+  }
+  // Maleta con ruedas del protagonista
+  function makeSuitcase() {
+    const g = new THREE.Group();
+    const shell = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.6, 0.24), new THREE.MeshPhongMaterial({ color: 0xff3d8b, shininess: 80, specular: 0x666666 }));
+    shell.position.y = 0.38; g.add(shell);
+    for (let i = -1; i <= 1; i++) { const r = new THREE.Mesh(new THREE.BoxGeometry(0.43, 0.02, 0.245), std(0xc22e6b, 50)); r.position.y = 0.38 + i * 0.18; g.add(r); }
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.5, 0.02), std(0x888899, 90)); handle.position.set(0, 0.92, -0.08); g.add(handle);
+    [-0.14, 0.14].forEach((x) => { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.03, 10), std(0x111111)); w.rotation.z = Math.PI / 2; w.position.set(x, 0.05, -0.08); g.add(w); });
+    return g;
+  }
+
+  const hero = makePerson({ skin: 0xe0ac85, top: 0x2b3a67, bot: 0x3a3f4d, hair: 0x2a1a10, hairStyle: 'short', jacket: true });
+  hero.rotation.y = Math.PI; scene.add(hero);
+  const suitcase = makeSuitcase(); scene.add(suitcase);
+  const heroBase = new THREE.Vector3(WALK_X - 0.4, 0.18, 0);
+  hero.position.copy(heroBase);
+
+  // ---------- Estado del juego ----------
+  const shell = Arcade.create({
+    id: 'hotel', title: ['Check', 'In'], bg: '#0a0d24',
+    tagline: 'Cruza la ciudad hasta tu hotel sin que te timen. Llega con todo y dormirás en la suite.',
+    how: [
+      'Por la calle te ofrecerán cosas. Pulsa <b>Aceptar</b> si es gente de fiar y <b>No, gracias</b> si es un timo.',
+      'Los timadores siempre tienen alguna señal: <b>prometen algo demasiado bueno</b>, <b>te meten prisa</b>, <b>llevan gafas de sol de noche</b> o <b>esconden una mano a la espalda</b>. La gente honrada nunca hace nada de eso.',
+      'Si aceptas un timo te roban la cartera, el móvil o la maleta. Si te quedas sin nada, pierdes. Si dices que no a alguien honrado, solo te pierdes su regalo.',
+      'Llega al hotel con tus tres cosas y te dan la <b>Suite Luxury</b>, que da muchos más puntos. Cada viaje es más difícil.'
+    ],
+    coinLabel: 'Monedas', coinSingular: 'moneda', coinValue: 10, rivalTop: 5200, statLabel: 'Hoteles',
+    crashTitle: '¡Te han desplumado!', reviveLabel: 'Recuperar la cartera', reviveReward: 'recuperar la cartera y seguir', countdown: false, crashDelay: 1100,
+    onStart() { resetRun(); },
+    onGo() {},
+    onRevive() { bag.cartera = true; paintBag(); removeStranger(); phase = 'walk'; beginWalk(); },
+    onMenu() { resetRun(); phase = 'idle'; },
+    onEnd() { hideOffer(); $('ciHotel').hidden = true; $('ciTop').hidden = true; },
+    onPause() {}
+  });
+
+  let phase = 'idle', trip = 0, step = 0, enc = 0, combo = 0, hotels = 0;
+  let bag = { cartera: true, movil: true, maleta: true }, results = [];
+  let stranger = null, deal = null, timer = 0, timerMax = 6, walkV = 0, heroWalk = 0, phaseT = 0, hotelObj = null;
+  let city = CITIES[0];
+
+  function setCity(i) {
+    city = CITIES[i % CITIES.length];
+    scene.background = skyTex(city);
+    scene.fog = new THREE.Fog(city.fog, 18, 95);
+    rain.visible = city.rain;
+    road.material.shininess = city.rain ? 120 : 50; road.material.specular.setHex(city.rain ? 0x555577 : 0x2a2a33);
+  }
+  function resetRun() {
+    trip = 0; step = 0; enc = 0; combo = 0; hotels = 0; results = [];
+    bag = { cartera: true, movil: true, maleta: true };
+    setCity(0); removeStranger(); removeHotel(); hideOffer(); $('ciHotel').hidden = true; $('ciWhy').hidden = true;
+    phase = 'walk'; beginWalk(); paintBag(); paintTrip(); $('ciTop').hidden = false;
+  }
+  function paintBag() {
+    $('ciBag').innerHTML = ITEMS.map((it) => `<span class="ci-item${bag[it.id] ? '' : ' lost'}" data-id="${it.id}"><span class="ic">${it.ic}</span><span class="tx">${it.nm}</span></span>`).join('');
+    suitcase.visible = bag.maleta;
+  }
+  function paintTrip() {
+    $('ciCity').innerHTML = `${city.name} · <b>${city.hotel}</b>`;
+    let h = '';
+    for (let i = 0; i < PER_TRIP; i++) h += `<i class="${results[i] === true ? 'ok' : results[i] === false ? 'ko' : i === step ? 'now' : ''}"></i>`;
+    $('ciDots').innerHTML = h + '<span class="h">🏨</span>';
+  }
+  function bagCount() { return ITEMS.filter((it) => bag[it.id]).length; }
+
+  // ---------- Encuentros ----------
+  let forced = null;
+  function makeDeal() {
+    const n = enc;
+    const scam = forced ? true : Math.random() < Math.min(0.56, 0.4 + n * 0.006);
+    const role = pick(ROLES);
+    const female = /a$|ora$/.test(role.rl.split(' ')[0]) || (role.old) || Math.random() < 0.15;
+    const name = role.old ? pick(['Doña Pilar', 'Doña Rosa', 'Doña Mercedes', 'Doña Carmen']) : pick(FIRST);
+    let tells = [];
+    if (scam) {
+      const k = n < 5 ? 3 : n < 14 ? 2 : (Math.random() < 0.5 ? 1 : 2);
+      tells = forced || ['bueno', 'prisa', 'gafas', 'mano'].sort(() => Math.random() - 0.5).slice(0, k); forced = null;
+    }
+    const [line, value] = pick(role.honest);
+    let say = line;
+    if (tells.includes('bueno')) say = pick(TOO_GOOD);
+    if (tells.includes('prisa')) say = say + ' ' + pick(HURRY);
+    const glasses = tells.includes('gafas') ? 'sun' : (!scam && n > 8 && Math.random() < 0.35 ? 'clear' : (Math.random() < 0.15 ? 'clear' : null));
+    return {
+      scam, tells, role, name, say, value: value + Math.min(6, Math.floor(n / 6)),
+      look: {
+        skin: pick(SKINS), top: role.top, bot: role.bot, hair: role.old ? 0xd8d0c8 : pick(HAIRS), hat: role.hat, hatC: role.hatC,
+        hairStyle: female ? 'long' : pick(['short', 'short', 'bald']), beard: !female && Math.random() < 0.3, old: role.old,
+        glasses, shortSleeve: role.rl === 'Camarero', vest: role.rl === 'Taxista' ? 0xf2c200 : null, jacket: Math.random() < 0.4
+      }
+    };
+  }
+  function spawnStranger() {
+    deal = makeDeal();
+    const P = makePerson(deal.look);
+    addProp(P, deal.role.prop);
+    if (deal.tells.includes('mano')) {
+      const a = P.userData.arms[0]; a.rotation.x = 0.5; a.rotation.z = 0.32; a.userData.el.rotation.z = 1.35; a.userData.el.rotation.x = 0.35; a.userData.hand.visible = false; a.userData.hidden = true;
+    }
+    P.position.set(WALK_X - 1.2, 0.18, -26);
+    P.rotation.y = 0.2;
+    P.userData.idle = Math.random() * 6;
+    world.add(P); stranger = P;
+  }
+  function removeStranger() { if (stranger) { world.remove(stranger); stranger = null; } }
+  function beginWalk() { phaseT = 0; spawnStranger(); }
+
+  function showOffer() {
+    $('ciName').textContent = deal.name; $('ciRole').textContent = deal.role.rl; $('ciSay').textContent = '«' + deal.say + '»';
+    timerMax = Math.max(3.4, 7 - enc * 0.12); timer = timerMax;
+    $('ciOffer').classList.remove('off');
+    $('ciYes').disabled = false; $('ciNo').disabled = false;
+  }
+  function hideOffer() { $('ciOffer').classList.add('off'); }
+
+  function fx(text, color) { const f = $('ciFx'); f.textContent = text; f.style.color = color; f.classList.remove('show'); void f.offsetWidth; f.classList.add('show'); }
+  let whyT = null;
+  function why(html) { const w = $('ciWhy'); w.innerHTML = html; w.hidden = false; clearTimeout(whyT); whyT = setTimeout(() => (w.hidden = true), 2400); }
+  function tellsText(t) { const a = t.map((k) => TELL_TEXT[k]); return a.length > 1 ? a.slice(0, -1).join(', ') + ' y ' + a[a.length - 1] : a[0]; }
+  function screenPos(obj, yOff) {
+    const v = new THREE.Vector3(); obj.getWorldPosition(v); v.y += yOff || 0; v.project(camera);
+    return { x: (v.x * 0.5 + 0.5) * canvas.clientWidth, y: (-v.y * 0.5 + 0.5) * canvas.clientHeight };
+  }
+  function coinBurst(n) {
+    const from = screenPos(stranger, 1.2), to = document.getElementById('shCoins').getBoundingClientRect();
+    const app = $('app').getBoundingClientRect();
+    for (let i = 0; i < Math.min(n, 12); i++) {
+      const d = document.createElement('div'); d.className = 'ci-coin'; $('app').appendChild(d);
+      const sx = from.x + rand(-30, 30), sy = from.y + rand(-20, 20), tx = to.left - app.left + to.width / 2, ty = to.top - app.top + to.height / 2;
+      d.animate([{ transform: `translate(${sx}px, ${sy}px) scale(.4)` }, { transform: `translate(${sx + rand(-40, 40)}px, ${sy - rand(40, 90)}px) scale(1.1)`, offset: 0.35 }, { transform: `translate(${tx}px, ${ty}px) scale(.6)` }],
+        { duration: 650 + i * 45, easing: 'cubic-bezier(.5,0,.6,1)' }).onfinish = () => d.remove();
+      d.style.left = '0px'; d.style.top = '0px';
+    }
+  }
+
+  function decide(accept) {
+    if (phase !== 'meet' || !shell.playing()) return;
+    hideOffer(); phase = 'resolve'; phaseT = 0; Arcade.audio();
+    const d = deal; let correct;
+    if (accept && !d.scam) {
+      correct = true; combo++;
+      shell.coin(d.value); shell.addBase(30 + Math.min(combo, 10) * 6);
+      coinBurst(d.value); fx('+' + d.value * (shell.mult || 1) + ' monedas', 'var(--gold)'); shell.haptic('success');
+      shell.tone(660, 990, 0.12, 'triangle', 0.06); setTimeout(() => shell.tone(990, 1320, 0.14, 'triangle', 0.05), 90);
+      stranger.userData.react = 'wave';
+    } else if (accept && d.scam) {
+      correct = false; combo = 0;
+      const left = ITEMS.filter((it) => bag[it.id]); const lost = pick(left); bag[lost.id] = false;
+      paintBag(); const el = document.querySelector(`.ci-item[data-id="${lost.id}"]`); if (el) el.classList.add('pop');
+      fx('¡Te han robado!', 'var(--bad)'); why(`Te ha quitado ${lost.id === 'movil' ? 'el móvil' : 'la ' + lost.nm.toLowerCase()}. Era un timador: ${tellsText(d.tells)}.`);
+      shell.haptic('error'); shell.noise && shell.noise(0.25, 0.08); shell.tone(320, 110, 0.4, 'sawtooth', 0.06);
+      stranger.userData.react = 'flee'; stranger.userData.loot = lost.id === 'maleta';
+    } else if (!accept && d.scam) {
+      correct = true; combo++;
+      shell.addBase(60 + Math.min(combo, 10) * 10);
+      fx('¡Bien visto!', 'var(--good)'); why(`Era un timador: ${tellsText(d.tells)}.`);
+      shell.haptic('success'); shell.tone(520, 780, 0.1, 'square', 0.05); setTimeout(() => shell.tone(780, 1170, 0.16, 'square', 0.05), 100);
+      stranger.userData.react = 'flee';
+    } else {
+      correct = false; combo = 0;
+      fx('Era de fiar', 'var(--muted)'); why(`No tenía ninguna señal de timo. Te has perdido ${d.value} monedas.`);
+      shell.tone(400, 300, 0.18, 'sine', 0.05);
+      stranger.userData.react = 'shrug';
+    }
+    results[step] = correct; enc++; paintTrip(); shell.paintHud();
+    shell.stat = hotels;
+  }
+  $('ciYes').onclick = () => decide(true);
+  $('ciNo').onclick = () => decide(false);
+  addEventListener('keydown', (e) => {
+    if (phase === 'meet') { if (e.key === 'ArrowRight' || e.key === 'Enter' || e.key === 's') decide(true); if (e.key === 'ArrowLeft' || e.key === 'n') decide(false); }
+    else if (phase === 'hotel' && !$('ciHotel').hidden && (e.key === 'Enter' || e.key === ' ')) nextTrip();
+  });
+
+  function afterResolve() {
+    removeStranger();
+    if (bagCount() === 0) { phase = 'dead'; shell.crash(); return; }
+    step++;
+    if (step >= PER_TRIP) { phase = 'tohotel'; phaseT = 0; spawnHotel(); }
+    else { phase = 'walk'; beginWalk(); }
+    paintTrip();
+  }
+
+  // ---------- Hotel ----------
+  function spawnHotel() {
+    // El hotel cierra la calle: fachada ancha mirando hacia la cámara, entrada sobre la acera
+    const g = new THREE.Group();
+    const fm = new THREE.MeshLambertMaterial({ map: FACADES[3].clone(), emissive: 0xffffff, emissiveIntensity: 1, color: 0xd8c79a });
+    fm.map.needsUpdate = true; fm.map.repeat.set(9, 7); fm.emissiveMap = fm.map;
+    const facade = new THREE.Mesh(new THREE.BoxGeometry(24, 34, 8), fm); facade.position.set(0, 17, 0); g.add(facade);
+    const base = new THREE.Mesh(new THREE.BoxGeometry(24.2, 4.4, 8.2), new THREE.MeshPhongMaterial({ color: 0x1a1420, shininess: 60 })); base.position.set(0, 2.2, 0); g.add(base);
+    const X = WALK_X - 0.4;
+    const door = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 3), new THREE.MeshBasicMaterial({ color: 0xffe2a8 })); door.position.set(X, 1.6, 4.12); g.add(door);
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.15, 0.2), std(0xd4af37, 120)); frame.position.set(X, 3.15, 4.15); g.add(frame);
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.22, 3), new THREE.MeshPhongMaterial({ color: 0x8b1d3a, shininess: 40 })); canopy.position.set(X, 3.4, 5.6); g.add(canopy);
+    [-2.1, 2.1].forEach((dx) => { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 3.4, 8), std(0xd4af37, 120)); p.position.set(X + dx, 1.7, 7); g.add(p); });
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(9, 2), new THREE.MeshBasicMaterial({ map: canvasTex(512, 114, (c, w, h) => {
+      c.fillStyle = '#120a1a'; c.fillRect(0, 0, w, h); c.font = 'bold 64px Righteous, Arial Rounded MT Bold, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.shadowColor = '#ffd166'; c.shadowBlur = 26; c.fillStyle = '#ffd166'; c.fillText('★ HOTEL ★', w / 2, h / 2 + 4); c.shadowBlur = 0; c.globalAlpha = 0.7; c.fillStyle = '#fff'; c.fillText('★ HOTEL ★', w / 2, h / 2 + 4);
+    }) }));
+    sign.position.set(X - 1, 6.2, 4.15); g.add(sign);
+    const carpet = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 5), new THREE.MeshLambertMaterial({ color: 0xb3123b })); carpet.rotation.x = -Math.PI / 2; carpet.position.set(X, 0.2, 6.5); g.add(carpet);
+    const glow = new THREE.PointLight(0xffd8a0, 1.6, 14, 2); glow.position.set(X, 3, 7); g.add(glow);
+    const doorman = makePerson({ skin: pick(SKINS), top: 0x6b0f2a, bot: 0x1a1a22, hair: 0x1b1410, hat: 'flat', hatC: 0x6b0f2a });
+    doorman.position.set(X - 1.5, 0.2, 6.2); doorman.rotation.y = 0.3; g.add(doorman); g.userData.doorman = doorman;
+    g.position.set(0, 0, -60);
+    world.add(g); hotelObj = g;
+  }
+  function removeHotel() { if (hotelObj) { world.remove(hotelObj); hotelObj = null; } }
+  function arriveHotel() {
+    phase = 'hotel'; hotels++; shell.stat = hotels;
+    const n = bagCount(), lvl = trip + 1;
+    const rooms = [null, ['Habitación Estándar', '★★★', 60], ['Habitación Superior', '★★★★', 180], ['Suite Luxury', '★★★★★', 500]];
+    const [room, stars, base] = rooms[n];
+    const bonus = base * lvl;
+    shell.addBase(bonus); shell.paintHud();
+    $('ciHk').textContent = `Check-in en ${city.hotel}, ${city.name}`;
+    $('ciRoom').textContent = room; $('ciStars').textContent = stars;
+    $('ciHtext').innerHTML = n === 3 ? '¡Has llegado con <b>todo</b>! Jacuzzi, vistas a la ciudad y desayuno en la cama.' : `Has llegado con ${n} de tus 3 cosas. Llega sin que te roben nada y dormirás en la <b>Suite Luxury</b>.`;
+    $('ciBonus').textContent = `+${Arcade.fmt(bonus)} puntos`;
+    $('ciNext').textContent = `Viajar a ${CITIES[(trip + 1) % CITIES.length].name}`;
+    $('ciHotel').hidden = false; hideOffer();
+    if (n === 3) { shell.tone(523, 523, 0.14, 'triangle', 0.06); setTimeout(() => shell.tone(659, 659, 0.14, 'triangle', 0.06), 140); setTimeout(() => shell.tone(784, 784, 0.14, 'triangle', 0.06), 280); setTimeout(() => shell.tone(1047, 1047, 0.4, 'triangle', 0.07), 420); shell.haptic('success'); }
+    else shell.tone(523, 659, 0.3, 'triangle', 0.05);
+  }
+  function nextTrip() {
+    if (phase !== 'hotel' || !shell.playing()) return;
+    $('ciHotel').hidden = true; removeHotel();
+    trip++; step = 0; results = []; bag = { cartera: true, movil: true, maleta: true };
+    setCity(trip); paintBag(); paintTrip();
+    fx(city.name, 'var(--ink)');
+    phase = 'walk'; beginWalk();
+  }
+  $('ciNext').onclick = nextTrip;
+
+  // ---------- Animación ----------
+  function animPerson(P, t, walk, amp) {
+    const L = P.userData.legs, A = P.userData.arms, s = Math.sin(t), a = amp == null ? 1 : amp;
+    if (walk) {
+      L[0].rotation.x = s * 0.55 * a; L[1].rotation.x = -s * 0.55 * a;
+      L[0].userData.knee.rotation.x = Math.max(0, -Math.cos(t)) * 0.8 * a; L[1].userData.knee.rotation.x = Math.max(0, Math.cos(t)) * 0.8 * a;
+      A[0].rotation.x = -s * 0.45 * a; A[1].rotation.x = s * 0.45 * a;
+      P.userData.torso.position.y = 0.92 + Math.abs(Math.cos(t)) * 0.035 * a;
+    } else {
+      L.forEach((l) => { l.rotation.x *= 0.85; l.userData.knee.rotation.x *= 0.85; });
+      P.userData.torso.position.y = 0.92 + Math.sin(t * 0.5) * 0.006;
+      P.userData.torso.rotation.z = Math.sin(t * 0.3) * 0.02;
+    }
+  }
+  function moveWorld(dz) {
+    buildings.forEach((b) => {
+      b.position.z += dz;
+      if (b.position.z - b.userData.w / 2 > 14) { const f = rowFront(b.userData.side); b.position.z = f - rand(0.3, 1.2) - b.userData.w / 2; }
+    });
+    lamps.forEach((l) => { l.position.z += dz; if (l.position.z > 14) l.position.z -= 108; });
+    cars.forEach((c) => { c.position.z += dz; });
+    if (stranger && phase !== 'meet' && !(phase === 'resolve' && phaseT < 0.7)) stranger.position.z += dz;
+    if (hotelObj) hotelObj.position.z += dz;
+    roadTex.offset.y += dz / (240 / 18); walkTex.offset.y += dz / (240 / 60);
+  }
+
+  const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), tmpV = new THREE.Vector3();
+  camera.position.set(WALK_X - 2.6, 2.7, 5.4); camLook.set(WALK_X - 0.6, 1.4, -6);
+  let last = performance.now(), T = 0;
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const playing = shell.playing(), st = shell.state;
+    const live = playing || st === 'menu';
+    if (live) T += dt;
+    let speed = 0;
+
+    if (st === 'menu' || phase === 'idle') {
+      speed = 2.2; if (stranger) removeStranger();
+    } else if (playing) {
+      phaseT += dt;
+      if (phase === 'walk') {
+        speed = 5.2;
+        if (stranger && stranger.position.z > -2.3) { stranger.position.z = -2.3; phase = 'meet'; showOffer(); }
+      } else if (phase === 'meet') {
+        timer -= dt; $('ciTimer').style.transform = `scaleX(${clamp(timer / timerMax, 0, 1)})`;
+        if (timer <= 0) decide(false);
+      } else if (phase === 'resolve') {
+        const r = stranger && stranger.userData.react;
+        if (r === 'flee') speed = phaseT > 0.9 ? 5.2 : 0; else if (phaseT > 0.7) speed = 5.2;
+        if (phaseT > 1.6) afterResolve();
+      } else if (phase === 'tohotel') {
+        speed = 5.2;
+        if (hotelObj && hotelObj.position.z > -11.5) { hotelObj.position.z = -11.5; arriveHotel(); }
+      }
+    }
+    walkV = lerp(walkV, speed, 1 - Math.pow(0.002, dt));
+    if (live) moveWorld(walkV * dt);
+    cars.forEach((c) => { c.visible = !hotelObj; if (!live) return; c.position.z += (c.userData.lane > 0 ? 1 : -1) * c.userData.v * dt * (c.userData.lane > 0 ? 1 : 0.6); if (c.position.z > 16 || c.position.z < -140) resetCar(c, false); });
+
+    // Protagonista
+    const walking = walkV > 0.4;
+    if (live) heroWalk += dt * (walking ? walkV * 1.7 : 0);
+    animPerson(hero, heroWalk, walking, clamp(walkV / 4, 0, 1));
+    const ra = hero.userData.arms[0]; if (bag.maleta) { ra.rotation.x = 0.25; ra.rotation.z = -0.05; }
+    hero.position.y = heroBase.y;
+    suitcase.position.set(hero.position.x + 0.32, 0.18, hero.position.z + 0.55); suitcase.rotation.x = -0.35; suitcase.rotation.y = 0.05;
+
+    // Desconocido
+    if (stranger) {
+      const U = stranger.userData; U.idle += dt;
+      if (U.react === 'flee' && phase === 'resolve') {
+        if (phaseT > 0.25) {
+          stranger.rotation.y = lerp(stranger.rotation.y, -Math.PI / 2 - 0.3, 0.2);
+          stranger.position.x -= dt * 7; stranger.position.z -= dt * 3;
+          animPerson(stranger, U.idle * 14, true, 1.2);
+        }
+      } else if (U.react === 'shrug' && phase === 'resolve') {
+        const A = U.arms; A.forEach((a) => { a.rotation.z = lerp(a.rotation.z, a.userData.s * 0.9, 0.15); a.userData.el.rotation.x = lerp(a.userData.el.rotation.x, -1.2, 0.15); });
+        animPerson(stranger, U.idle, false);
+      } else if (U.react === 'wave' && phase === 'resolve') {
+        const a = U.arms[0]; a.rotation.z = lerp(a.rotation.z, -2.6, 0.15); a.userData.el.rotation.z = Math.sin(U.idle * 14) * 0.4;
+        animPerson(stranger, U.idle, false);
+      } else {
+        animPerson(stranger, U.idle, false);
+        if (phase === 'meet') {
+          stranger.rotation.y = lerp(stranger.rotation.y, 0.75, 0.08);
+          U.head.rotation.y = Math.sin(U.idle * 1.3) * 0.15;
+          if (deal && deal.tells.includes('prisa')) { stranger.position.x = WALK_X - 1.2 + Math.sin(U.idle * 9) * 0.03; U.arms[1].rotation.x = -0.6 + Math.sin(U.idle * 8) * 0.35; }
+          else U.arms[1].rotation.x = lerp(U.arms[1].rotation.x, -0.25 + Math.sin(U.idle * 1.6) * 0.12, 0.1);
+        }
+      }
+      if (U.loot && phase === 'resolve' && phaseT > 0.25) { suitcase.visible = true; suitcase.position.set(stranger.position.x + 0.2, 0.18, stranger.position.z + world.position.z + 0.3); }
+      else if (!bag.maleta) suitcase.visible = false;
+    } else if (!bag.maleta) suitcase.visible = false;
+    if (hotelObj) animPerson(hotelObj.userData.doorman, T, false);
+
+    // Luces que siguen al protagonista
+    warm.position.set(hero.position.x - 1, 3.2, -1.5);
+    fill.position.copy(camera.position); fill.position.y += 0.3;
+    shopLight.position.set(hero.position.x + 2.2, 2, -3 + Math.sin(T * 0.4) * 2); shopLight.color.setHSL((T * 0.03) % 1, 0.8, 0.6);
+
+    // Lluvia
+    if (rain.visible && live) {
+      const p = rain.geometry.attributes.position, arr = p.array;
+      for (let i = 0; i < RAIN_N; i++) {
+        const o = i * 6; arr[o + 1] -= dt * 16; arr[o + 4] -= dt * 16; arr[o + 2] += walkV * dt; arr[o + 5] += walkV * dt;
+        if (arr[o + 1] < 0 || arr[o + 2] > 8) { const x = rand(-14, 14), y = rand(14, 18), z = rand(-40, 6); arr[o] = x; arr[o + 1] = y; arr[o + 2] = z; arr[o + 3] = x + 0.03; arr[o + 4] = y - 0.5; arr[o + 5] = z + 0.08; }
+      }
+      p.needsUpdate = true;
+    }
+
+    // Cámara
+    const meet = phase === 'meet' || (phase === 'resolve' && phaseT < 0.9);
+    const portrait = camera.aspect < 0.8;
+    if (st === 'menu' || phase === 'idle') { camPos.set(WALK_X - 3.2 + Math.sin(T * 0.2) * 0.4, 3.1, 6.6); tmpV.set(WALK_X - 1.2, 1.8, -8); }
+    else if (phase === 'hotel' || (phase === 'tohotel' && hotelObj && hotelObj.position.z > -24)) { camPos.set(WALK_X - 3.4, 1.7, 7.5); tmpV.set(WALK_X - 0.6, portrait ? 3.4 : 3, -6); }
+    else if (meet) { camPos.set(WALK_X + 0.5, 1.62, portrait ? -0.25 : -0.5); tmpV.set(WALK_X - 1.2, portrait ? 1.12 : 1.32, -2.3); }
+    else { camPos.set(WALK_X - 1.6, 2.5, 5); tmpV.set(WALK_X - 1.1, 1.3, -6); }
+    const k = 1 - Math.pow(0.04, dt);
+    camera.position.lerp(camPos, k); camLook.lerp(tmpV, k); camera.lookAt(camLook);
+
+    shell.paintHud();
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+
+  setCity(0); resize(); paintBag(); paintTrip();
+  requestAnimationFrame(frame);
+
+  window.__game = {
+    shell, get phase() { return phase; }, get deal() { return deal; }, get bag() { return bag; }, get step() { return step; }, get trip() { return trip; },
+    decide, nextTrip, forceStep(n) { step = n; }, forceTells(t) { forced = t; }, dbg() { return { cam: camera.position.toArray(), look: camLook.toArray(), str: stranger && stranger.position.toArray(), sp: stranger && screenPos(stranger, 1) }; }
+  };
+})();
+</script>
+</body>
+</html>

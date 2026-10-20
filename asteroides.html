@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Asteroides</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+<style>
+/* Layout: monitor vectorial a pantalla completa; la nave gira y empuja con inercia, todo cruza los bordes */
+:root {
+  --bg: #000000;
+  --ink: #eafcff;
+  --muted: #86aab3;
+  --panel: rgba(2, 10, 14, 0.9);
+  --line: rgba(140, 240, 255, 0.26);
+  --accent: #6ff3ff;
+  --onaccent: #001a1f;
+  --gold: #ffd447;
+  --ongold: #2a2000;
+  --goldline: rgba(255, 212, 71, 0.4);
+  --goldtint: rgba(255, 212, 71, 0.08);
+  --veil: rgba(0, 0, 0, 0.45);
+  --shadow: rgba(80, 230, 255, 0.25);
+  --display: "VT323", "Courier New", ui-monospace, monospace;
+  --body: "Share Tech Mono", ui-monospace, "Courier New", monospace;
+  color-scheme: dark;
+}
+.sh-logo { letter-spacing: .06em; text-shadow: 0 0 12px rgba(111, 243, 255, .55); font-size: clamp(52px, 17vw, 72px); }
+.sh-stat .v { font-size: 32px; text-shadow: 0 0 10px rgba(111, 243, 255, .5); }
+.sh-btn { font-size: 24px; letter-spacing: .04em; }
+#crt { position: absolute; inset: 0; z-index: 4; pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0) 58%, rgba(0,0,0,.6) 100%),
+    repeating-linear-gradient(to bottom, rgba(0,0,0,.22) 0 1px, rgba(0,0,0,0) 1px 3px); }
+#safe { position: absolute; top: 0; left: 0; width: 1px; height: env(safe-area-inset-top, 0px); visibility: hidden; pointer-events: none; }
+#pad { position: absolute; inset: auto 0 0 0; height: 0; z-index: 7; pointer-events: none; }
+.pb { position: absolute; width: 66px; height: 66px; border-radius: 50%; border: 1.5px solid rgba(140, 240, 255, .42);
+  background: rgba(120, 230, 255, .06); color: rgba(220, 252, 255, .8); display: flex; align-items: center; justify-content: center;
+  pointer-events: auto; touch-action: none; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; outline: none;
+  box-shadow: 0 0 10px rgba(111, 243, 255, .12), inset 0 0 10px rgba(111, 243, 255, .08); }
+.pb svg { width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; filter: drop-shadow(0 0 3px rgba(111,243,255,.8)); }
+.pb.on { background: rgba(120, 230, 255, .2); border-color: rgba(200, 250, 255, .9); color: #fff; box-shadow: 0 0 18px rgba(111, 243, 255, .45), inset 0 0 14px rgba(111, 243, 255, .25); }
+.pb .lb { position: absolute; bottom: -17px; left: 50%; transform: translateX(-50%); font: 11px var(--body); letter-spacing: .12em; color: rgba(160, 220, 230, .55); white-space: nowrap; }
+#bL { left: max(14px, env(safe-area-inset-left, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 26px); }
+#bR { left: calc(max(14px, env(safe-area-inset-left, 0px)) + 78px); bottom: calc(env(safe-area-inset-bottom, 0px) + 26px); }
+#bF { right: max(14px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 26px); width: 74px; height: 74px; }
+#bT { right: calc(max(14px, env(safe-area-inset-right, 0px)) + 86px); bottom: calc(env(safe-area-inset-bottom, 0px) + 26px); }
+#bH { right: calc(max(14px, env(safe-area-inset-right, 0px)) + 18px); bottom: calc(env(safe-area-inset-bottom, 0px) + 124px); width: 40px; height: 40px; }
+#bH svg { width: 20px; height: 20px; }
+#bH .lb { bottom: auto; top: -16px; }
+</style>
+</head>
+<body>
+<div id="app"><canvas id="c" aria-label="Juego Asteroides"></canvas><div id="crt"></div><div id="safe"></div>
+  <div id="pad" hidden>
+    <button class="pb" id="bL" tabindex="-1" aria-label="Girar a la izquierda"><svg viewBox="0 0 32 32"><path d="M20 7 L9 16 L20 25"/></svg><span class="lb">GIRAR</span></button>
+    <button class="pb" id="bR" tabindex="-1" aria-label="Girar a la derecha"><svg viewBox="0 0 32 32"><path d="M12 7 L23 16 L12 25"/></svg><span class="lb">GIRAR</span></button>
+    <button class="pb" id="bT" tabindex="-1" aria-label="Impulso"><svg viewBox="0 0 32 32"><path d="M16 5 L24 23 L16 19 L8 23 Z"/><path d="M12.5 25 L16 29 L19.5 25"/></svg><span class="lb">IMPULSO</span></button>
+    <button class="pb" id="bF" tabindex="-1" aria-label="Disparar"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="3"/><path d="M16 4 V9 M16 23 V28 M4 16 H9 M23 16 H28"/></svg><span class="lb">FUEGO</span></button>
+    <button class="pb" id="bH" tabindex="-1" aria-label="Hiperespacio"><svg viewBox="0 0 32 32"><path d="M16 4 L19 13 L28 16 L19 19 L16 28 L13 19 L4 16 L13 13 Z"/></svg><span class="lb">HIPER</span></button>
+  </div>
+</div>
+<script src="config.js"></script>
+<script src="comun.js"></script>
+<script>
+(() => {
+  'use strict';
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  const pad = document.getElementById('pad'), safeProbe = document.getElementById('safe');
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const TAU = Math.PI * 2;
+  let W = 0, H = 0, DPR = 1, U = 1, hudTop = 64;
+  const F = { y: 0, h: 0 }; // campo de juego vertical (el ancho es toda la pantalla)
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = canvas.clientWidth || innerWidth; H = canvas.clientHeight || innerHeight;
+    canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    U = clamp(Math.min(W, H * 0.75) / 400, 0.8, 1.6);
+    hudTop = (safeProbe.offsetHeight || 0) + 62;
+    setField(fieldFull);
+  }
+  let fieldFull = true;
+  function setField(full) {
+    fieldFull = full; F.y = full ? 0 : hudTop; F.h = H - F.y;
+    for (const o of [ship, ...rocks, ...bullets, ...sBullets, ...crystals]) wrap(o);
+  }
+  addEventListener('resize', resize);
+
+  // ---------- Mundo ----------
+  const SIZE = { L: { r: 40, pts: 20, next: 'M', v: [28, 55] }, M: { r: 21, pts: 50, next: 'S', v: [45, 90] }, S: { r: 11, pts: 100, next: null, v: [70, 130] } };
+  let ship = { x: 0, y: 0, vx: 0, vy: 0, a: -Math.PI / 2, alive: true, invuln: 0, thrust: false, hidden: 0 };
+  let rocks = [], bullets = [], sBullets = [], crystals = [], debris = [], dots = [], saucer = null;
+  let wave = 0, waveT = 0, waveRocks = 1, nextWave = 0, saucerT = 0, beatT = 0, beatHi = false, banner = null;
+  let fireCd = 0, thrustSnd = 0, hyperCd = 0, hyperPrev = false, warbleT = 0, warbleHi = false, clock = 0;
+
+  function wrap(o) {
+    if (o.x < 0) o.x += W; else if (o.x >= W) o.x -= W;
+    if (o.y < F.y) o.y += F.h; else if (o.y >= F.y + F.h) o.y -= F.h;
+  }
+  function dlt(ax, ay, bx, by) {
+    let dx = bx - ax, dy = by - ay;
+    if (dx > W / 2) dx -= W; else if (dx < -W / 2) dx += W;
+    if (dy > F.h / 2) dy -= F.h; else if (dy < -F.h / 2) dy += F.h;
+    return [dx, dy];
+  }
+  const dist = (a, b) => { const d = dlt(a.x, a.y, b.x, b.y); return Math.hypot(d[0], d[1]); };
+
+  function makeRock(size, x, y, vx, vy) {
+    const n = 10 + Math.floor(Math.random() * 3), shape = [];
+    for (let i = 0; i < n; i++) shape.push(i % 3 === 1 ? rand(0.62, 0.8) : rand(0.85, 1.05));
+    const rk = { size, x, y, vx, vy, shape, rot: rand(0, TAU), vr: rand(-0.5, 0.5) };
+    rocks.push(rk); return rk;
+  }
+  function rockSpeed(size) {
+    const s = SIZE[size], k = Math.min(1.6, 1 + (wave - 1) * 0.07);
+    return rand(s.v[0], s.v[1]) * U * k;
+  }
+  function spawnWave(n) {
+    for (let i = 0; i < n; i++) {
+      let x, y, tries = 0;
+      do { if (Math.random() < 0.5) { x = rand(0, W); y = F.y + (Math.random() < 0.5 ? 2 : F.h - 2); } else { x = Math.random() < 0.5 ? 2 : W - 2; y = F.y + rand(0, F.h); } tries++; }
+      while (tries < 20 && Math.hypot(x - ship.x, y - ship.y) < 170 * U);
+      const a = rand(0, TAU), v = rockSpeed('L');
+      makeRock('L', x, y, Math.cos(a) * v, Math.sin(a) * v);
+    }
+  }
+  function startWave(n) {
+    wave = n; waveT = 0; nextWave = 0;
+    const count = Math.min(4 + (n - 1), 10);
+    spawnWave(count); waveRocks = count * 7;
+    saucerT = Math.max(7, rand(16, 24) - n);
+    banner = { txt: 'OLEADA ' + n, t: 2.2 };
+    shell.stat = n;
+  }
+  function attract() {
+    rocks = []; bullets = []; sBullets = []; crystals = []; saucer = null; debris = []; dots = [];
+    setField(true);
+    ship.alive = false; ship.x = W / 2; ship.y = H / 2;
+    const sizes = ['L', 'L', 'L', 'M', 'M', 'M', 'S', 'S', 'S'];
+    for (const s of sizes) { const a = rand(0, TAU), v = rand(15, 45) * U; makeRock(s, rand(0, W), rand(0, H), Math.cos(a) * v, Math.sin(a) * v); }
+    banner = null;
+  }
+  function resetShip() { ship.x = W / 2; ship.y = F.y + F.h / 2; ship.vx = ship.vy = 0; ship.a = -Math.PI / 2; ship.alive = true; ship.hidden = 0; }
+  function newGame() {
+    rocks = []; bullets = []; sBullets = []; crystals = []; saucer = null; debris = []; dots = [];
+    setField(false); resetShip(); ship.invuln = 0;
+    fireCd = 0; hyperCd = 0; beatT = 0.6; clock = 0;
+    startWave(1);
+  }
+
+  // ---------- Efectos ----------
+  function burst(x, y, n, speed, lines) {
+    for (let i = 0; i < n; i++) {
+      const a = rand(0, TAU), v = rand(0.3, 1) * speed * U;
+      if (lines && i % 2 === 0) debris.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, a: rand(0, TAU), va: rand(-8, 8), len: rand(3, 9) * U, life: rand(0.4, 0.9), max: 0.9 });
+      else dots.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: rand(0.3, 0.8) });
+    }
+  }
+  function shipLines() { // segmentos de la nave en coordenadas locales (morro hacia +x)
+    const s = U * 1.2;
+    return [[15 * s, 0, -10 * s, -9 * s], [15 * s, 0, -10 * s, 9 * s], [-6.5 * s, -6 * s, -6.5 * s, 6 * s]];
+  }
+  function shipDebris() {
+    const c = Math.cos(ship.a), s = Math.sin(ship.a);
+    for (const [x1, y1, x2, y2] of shipLines()) {
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, wx = ship.x + mx * c - my * s, wy = ship.y + mx * s + my * c;
+      const a = Math.atan2(y2 - y1, x2 - x1) + ship.a, ang = Math.atan2(wy - ship.y, wx - ship.x) + rand(-0.6, 0.6), v = rand(20, 60) * U;
+      debris.push({ x: wx, y: wy, vx: ship.vx * 0.3 + Math.cos(ang) * v, vy: ship.vy * 0.3 + Math.sin(ang) * v, a, va: rand(-3, 3), len: Math.hypot(x2 - x1, y2 - y1), life: 2.2, max: 2.2, keep: true });
+    }
+    burst(ship.x, ship.y, 26, 140, false);
+  }
+
+  function splitRock(rk, byPlayer) {
+    rk.dead = true;
+    const s = SIZE[rk.size];
+    if (byPlayer) shell.addBase(s.pts);
+    burst(rk.x, rk.y, rk.size === 'L' ? 18 : rk.size === 'M' ? 13 : 9, rk.size === 'L' ? 110 : 140, true);
+    shell.noise(rk.size === 'L' ? 0.55 : rk.size === 'M' ? 0.38 : 0.24, rk.size === 'L' ? 0.42 : 0.32, rk.size === 'L' ? 380 : rk.size === 'M' ? 700 : 1300);
+    if (s.next) for (let i = 0; i < 2; i++) {
+      const a = rand(0, TAU), v = rockSpeed(s.next);
+      makeRock(s.next, rk.x, rk.y, rk.vx * 0.4 + Math.cos(a) * v, rk.vy * 0.4 + Math.sin(a) * v);
+    } else if (byPlayer && Math.random() < 0.2) dropCrystal(rk.x, rk.y, rk.vx * 0.3, rk.vy * 0.3);
+  }
+  function dropCrystal(x, y, vx, vy) { crystals.push({ x, y, vx, vy, t: 0, life: 9 }); }
+
+  function spawnSaucer() {
+    const pts = shell.points, small = Math.random() < clamp(0.12 + pts / 16000 + (wave - 1) * 0.05, 0.12, 0.75);
+    const dir = Math.random() < 0.5 ? 1 : -1, r = (small ? 9 : 17) * U;
+    saucer = { small, r, x: dir > 0 ? -r : W + r, y: F.y + rand(0.15, 0.85) * F.h, dir, vx: dir * (small ? 105 : 72) * U, vy: 0, turnT: rand(0.8, 2), fireT: small ? 0.9 : 1.2 };
+  }
+  function killSaucer(byPlayer) {
+    const s = saucer; saucer = null;
+    if (byPlayer) { shell.addBase(s.small ? 1000 : 200); dropCrystal(s.x, s.y, s.vx * 0.2, 0); }
+    burst(s.x, s.y, 22, 150, true);
+    shell.noise(0.5, 0.4, 900); shell.haptic('medium');
+    saucerT = Math.max(6, rand(14, 22) - wave);
+  }
+
+  function die() {
+    if (!ship.alive) return;
+    ship.alive = false; ship.thrust = false;
+    shipDebris(); shell.noise(1.1, 0.55, 420); shell.tone(140, 40, 0.6, 'sawtooth', 0.06);
+    shell.crash();
+  }
+
+  // ---------- Shell ----------
+  const shell = Arcade.create({
+    id: 'asteroides', title: ['Aste', 'roides'], bg: '#000000',
+    tagline: 'Gira, empuja y dispara. Que no te toque ni una roca.',
+    how: [
+      '<b>Botones de la izquierda</b>: girar la nave. <b>Derecha</b>: IMPULSO para acelerar y FUEGO para disparar (mantén pulsado para ráfaga).',
+      'La nave conserva la inercia y todo cruza los bordes de la pantalla. Las rocas grandes se parten en medianas y luego en pequeñas: <b>20, 50 y 100</b> puntos.',
+      'Los <b>platillos</b> te disparan: el grande vale 200 y el pequeño, que apunta mejor, 1000. HIPER te teletransporta en un apuro.',
+      'Las rocas pequeñas a veces sueltan un <b>cristal</b>: vuela hasta él para recogerlo. En teclado: flechas, espacio y Mayús.'
+    ],
+    coinLabel: 'Cristales', coinSingular: 'cristal', coinValue: 20, rivalTop: 7000, statLabel: 'Oleada',
+    crashTitle: '¡Nave destruida!', reviveLabel: 'Nave de repuesto', reviveReward: 'una nave de repuesto', countdown: true, crashDelay: 1100,
+    onStart() { newGame(); },
+    onGo() { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); },
+    onRevive() {
+      debris = debris.filter((d) => !d.keep); sBullets = []; bullets = [];
+      if (saucer) { burst(saucer.x, saucer.y, 10, 100, true); saucer = null; saucerT = 10; }
+      resetShip(); ship.invuln = 3;
+    },
+    onMenu() { attract(); },
+    badges: () => (wave > 0 && shell.state !== 'menu' ? ['Oleada ' + wave] : [])
+  });
+
+  // ---------- Controles ----------
+  const tIn = { l: false, r: false, t: false, f: false, h: false }, kIn = { l: false, r: false, t: false, f: false, h: false };
+  const btns = { l: 'bL', r: 'bR', t: 'bT', f: 'bF', h: 'bH' };
+  for (const k in btns) {
+    const el = document.getElementById(btns[k]);
+    const on = (e) => { e.preventDefault(); Arcade.audio(); try { el.setPointerCapture(e.pointerId); } catch (er) {} tIn[k] = true; el.classList.add('on'); };
+    const off = () => { tIn[k] = false; el.classList.remove('on'); };
+    el.addEventListener('pointerdown', on);
+    el.addEventListener('pointerup', off); el.addEventListener('pointercancel', off); el.addEventListener('lostpointercapture', off);
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+  const KEYS = { ArrowLeft: 'l', a: 'l', A: 'l', ArrowRight: 'r', d: 'r', D: 'r', ArrowUp: 't', w: 't', W: 't', ' ': 'f', Spacebar: 'f', Shift: 'h', ArrowDown: 'h', s: 'h', S: 'h' };
+  addEventListener('keydown', (e) => { const k = KEYS[e.key]; if (!k) return; kIn[k] = true; if (shell.state === 'play') e.preventDefault(); }, true);
+  addEventListener('keyup', (e) => { const k = KEYS[e.key]; if (!k) return; kIn[k] = false; if (shell.state === 'play') e.preventDefault(); }, true);
+  addEventListener('blur', () => { for (const k in kIn) kIn[k] = false; });
+  const bot = { on: false, l: false, r: false, t: false, f: false, h: false };
+  const inp = (k) => tIn[k] || kIn[k] || (bot.on && bot[k]);
+
+  // ---------- Actualización ----------
+  function fire() {
+    if (bullets.length >= 5) return;
+    const c = Math.cos(ship.a), s = Math.sin(ship.a), v = 540 * U;
+    bullets.push({ x: ship.x + c * 15 * U, y: ship.y + s * 15 * U, vx: ship.vx + c * v, vy: ship.vy + s * v, life: 0.85 });
+    shell.tone(1500, 320, 0.09, 'square', 0.025);
+  }
+  function hyperspace() {
+    hyperCd = 1.2; ship.hidden = 0.45; ship.vx *= 0.2; ship.vy *= 0.2;
+    burst(ship.x, ship.y, 10, 90, false);
+    ship.x = rand(0.1, 0.9) * W; ship.y = F.y + rand(0.12, 0.88) * F.h;
+    shell.tone(180, 1800, 0.28, 'sine', 0.06);
+  }
+
+  function update(dt) {
+    const st = shell.state, playing = st === 'play';
+    const sim = playing || st === 'dying' || st === 'menu' || st === 'over' || st === 'crashed';
+    clock += dt;
+    if (bot.on && playing) runBot();
+
+    if (playing && ship.alive) {
+      waveT += dt;
+      const rot = (inp('l') ? -1 : 0) + (inp('r') ? 1 : 0);
+      ship.a += rot * 4.6 * dt;
+      ship.thrust = inp('t') && ship.hidden <= 0;
+      if (ship.thrust) {
+        const acc = 340 * U; ship.vx += Math.cos(ship.a) * acc * dt; ship.vy += Math.sin(ship.a) * acc * dt;
+        thrustSnd -= dt; if (thrustSnd <= 0) { thrustSnd = 0.09; shell.noise(0.13, 0.12, 260); }
+      }
+      const drag = Math.pow(0.62, dt); ship.vx *= drag; ship.vy *= drag;
+      const sp = Math.hypot(ship.vx, ship.vy), max = 420 * U;
+      if (sp > max) { ship.vx *= max / sp; ship.vy *= max / sp; }
+      ship.x += ship.vx * dt; ship.y += ship.vy * dt; wrap(ship);
+      if (ship.invuln > 0) ship.invuln -= dt;
+      if (ship.hidden > 0) ship.hidden -= dt;
+      fireCd -= dt; hyperCd -= dt;
+      if (inp('f') && fireCd <= 0 && ship.hidden <= 0) { fire(); fireCd = 0.17; }
+      const h = inp('h'); if (h && !hyperPrev && hyperCd <= 0) hyperspace(); hyperPrev = h;
+
+      // latido: dos notas graves que se aceleran a lo largo de la oleada
+      const left = rocks.reduce((n, r) => n + (r.size === 'L' ? 7 : r.size === 'M' ? 3 : 1), 0);
+      const prog = Math.max(clamp(waveT / 45, 0, 1), 1 - left / waveRocks);
+      beatT -= dt;
+      if (beatT <= 0 && rocks.length) {
+        beatT = 1.0 - prog * 0.74; beatHi = !beatHi;
+        const f = beatHi ? 62 : 55; shell.tone(f, f * 0.85, 0.11, 'square', 0.07); shell.tone(f * 2, f * 1.6, 0.08, 'triangle', 0.08);
+      }
+    } else ship.thrust = false;
+
+    if (sim) {
+      for (const r of rocks) { r.x += r.vx * dt; r.y += r.vy * dt; r.rot += r.vr * dt; wrap(r); }
+      for (const b of bullets) { b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt; wrap(b); }
+      for (const b of sBullets) { b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt; wrap(b); }
+      for (const c of crystals) { c.x += c.vx * dt; c.y += c.vy * dt; c.t += dt; c.life -= dt; wrap(c); }
+      if (saucer && (playing || st === 'dying')) updateSaucer(dt);
+    }
+
+    if (playing) {
+      // balas contra rocas y platillo
+      for (const b of bullets) {
+        if (b.life <= 0) continue;
+        for (const r of rocks) { if (!r.dead && dist(b, r) < SIZE[r.size].r * U * 0.95) { b.life = 0; splitRock(r, true); break; } }
+        if (b.life > 0 && saucer && dist(b, saucer) < saucer.r * 1.15) { b.life = 0; killSaucer(true); }
+      }
+      for (const b of sBullets) {
+        if (b.life <= 0) continue;
+        for (const r of rocks) { if (!r.dead && dist(b, r) < SIZE[r.size].r * U * 0.95) { b.life = 0; splitRock(r, false); break; } }
+      }
+      if (saucer) for (const r of rocks) { if (!r.dead && dist(saucer, r) < SIZE[r.size].r * U * 0.85 + saucer.r * 0.8) { splitRock(r, false); killSaucer(false); break; } }
+      if (ship.alive && ship.hidden <= 0) {
+        if (ship.invuln <= 0) {
+          for (const r of rocks) { if (!r.dead && dist(ship, r) < SIZE[r.size].r * U * 0.86 + 10 * U) { splitRock(r, true); die(); break; } }
+          if (ship.alive && saucer && dist(ship, saucer) < saucer.r + 9 * U) { killSaucer(true); die(); }
+          if (ship.alive) for (const b of sBullets) { if (b.life > 0 && dist(ship, b) < 10 * U) { b.life = 0; die(); break; } }
+        }
+        for (const c of crystals) if (c.life > 0 && dist(ship, c) < 20 * U) {
+          c.life = 0; shell.coin(1); shell.haptic('light');
+          shell.tone(1175, 2350, 0.1, 'triangle', 0.08); shell.tone(1760, 3520, 0.12, 'triangle', 0.06, 0.07);
+          burst(c.x, c.y, 8, 70, false);
+        }
+      }
+      rocks = rocks.filter((r) => !r.dead);
+      // oleadas y platillos
+      if (!rocks.length) {
+        if (nextWave <= 0) nextWave = 2.2;
+        else { nextWave -= dt; if (nextWave <= 0) startWave(wave + 1); }
+      }
+      if (!saucer && ship.alive) { saucerT -= dt * (rocks.length && rocks.length <= 3 ? 1.6 : 1); if (saucerT <= 0 && rocks.length) spawnSaucer(); }
+    }
+    rocks = rocks.filter((r) => !r.dead);
+    bullets = bullets.filter((b) => b.life > 0);
+    sBullets = sBullets.filter((b) => b.life > 0);
+    crystals = crystals.filter((c) => c.life > 0);
+
+    for (const d of debris) { d.x += d.vx * dt; d.y += d.vy * dt; d.a += d.va * dt; d.vx *= 0.985; d.vy *= 0.985; d.life -= dt; }
+    debris = debris.filter((d) => d.life > 0);
+    for (const p of dots) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.97; p.vy *= 0.97; p.life -= dt; }
+    dots = dots.filter((p) => p.life > 0);
+    if (banner) { banner.t -= dt; if (banner.t <= 0) banner = null; }
+  }
+
+  function updateSaucer(dt) {
+    const s = saucer;
+    s.x += s.vx * dt; s.y += s.vy * dt;
+    if (s.y < F.y) s.y += F.h; else if (s.y >= F.y + F.h) s.y -= F.h;
+    s.turnT -= dt;
+    if (s.turnT <= 0) { s.turnT = rand(0.8, 2.2); s.vy = [-1, 0, 0, 1][Math.floor(Math.random() * 4)] * Math.abs(s.vx) * 0.7; }
+    if ((s.dir > 0 && s.x > W + s.r * 2) || (s.dir < 0 && s.x < -s.r * 2)) { saucer = null; saucerT = Math.max(6, rand(12, 20) - wave); return; }
+    warbleT -= dt;
+    if (warbleT <= 0) { warbleT = s.small ? 0.09 : 0.14; warbleHi = !warbleHi; const f = s.small ? (warbleHi ? 880 : 760) : (warbleHi ? 260 : 220); shell.tone(f, f, warbleT * 0.9, 'square', s.small ? 0.018 : 0.022); }
+    s.fireT -= dt;
+    if (s.fireT <= 0 && ship.alive && shell.state === 'play') {
+      s.fireT = s.small ? rand(0.75, 1.05) : rand(1.0, 1.5);
+      let a;
+      if (s.small) { const d = dlt(s.x, s.y, ship.x, ship.y), err = Math.max(0.06, 0.45 - shell.points / 25000); a = Math.atan2(d[1], d[0]) + rand(-err, err); }
+      else a = rand(0, TAU);
+      const v = 300 * U;
+      sBullets.push({ x: s.x + Math.cos(a) * s.r, y: s.y + Math.sin(a) * s.r, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1.1 });
+      shell.tone(950, 420, 0.08, 'sawtooth', 0.02);
+    }
+  }
+
+  // ---------- Bot de pruebas ----------
+  function runBot() {
+    bot.l = bot.r = bot.t = bot.f = false;
+    let best = null, bd = 1e9;
+    const targets = rocks.slice(); if (saucer) targets.push(saucer);
+    for (const r of targets) { const d = dist(ship, r); if (d < bd) { bd = d; best = r; } }
+    if (!best) return;
+    const d = dlt(ship.x, ship.y, best.x, best.y);
+    let da = Math.atan2(d[1], d[0]) - ship.a; da = Math.atan2(Math.sin(da), Math.cos(da));
+    if (da > 0.06) bot.r = true; else if (da < -0.06) bot.l = true;
+    if (Math.abs(da) < 0.25) bot.f = true;
+    if (Math.hypot(ship.vx, ship.vy) < 30 * U && bd > 260 * U && Math.abs(da) < 0.3) bot.t = true;
+  }
+
+  // ---------- Dibujo ----------
+  function offsets(x, y, r) {
+    const ox = [0], oy = [0];
+    if (x < r) ox.push(W); else if (x > W - r) ox.push(-W);
+    if (y < F.y + r) oy.push(F.h); else if (y > F.y + F.h - r) oy.push(-F.h);
+    const out = []; for (const a of ox) for (const b of oy) out.push([a, b]); return out;
+  }
+  function pathRock(r) {
+    const R = SIZE[r.size].r * U, n = r.shape.length;
+    for (const [ox, oy] of offsets(r.x, r.y, R * 1.1)) {
+      for (let i = 0; i <= n; i++) {
+        const k = r.shape[i % n], a = r.rot + i / n * TAU, x = r.x + ox + Math.cos(a) * R * k, y = r.y + oy + Math.sin(a) * R * k;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+    }
+  }
+  function pathShip() {
+    const c = Math.cos(ship.a), s = Math.sin(ship.a), L = shipLines();
+    const q = U * 1.2; if (ship.thrust && Math.random() < 0.85) { const tip = (-13 - Math.random() * 8) * q; L.push([-6.5 * q, -3.6 * q, tip, 0], [tip, 0, -6.5 * q, 3.6 * q]); }
+    for (const [ox, oy] of offsets(ship.x, ship.y, 22 * U)) {
+      for (const [x1, y1, x2, y2] of L) {
+        ctx.moveTo(ship.x + ox + x1 * c - y1 * s, ship.y + oy + x1 * s + y1 * c);
+        ctx.lineTo(ship.x + ox + x2 * c - y2 * s, ship.y + oy + x2 * s + y2 * c);
+      }
+    }
+  }
+  function pathSaucer(s) {
+    const r = s.r, P = (pts) => pts.forEach(([x, y], i) => (i ? ctx.lineTo(s.x + x * r, s.y + y * r) : ctx.moveTo(s.x + x * r, s.y + y * r)));
+    P([[-1, 0], [-0.42, 0.36], [0.42, 0.36], [1, 0], [-1, 0], [-0.42, -0.34], [0.42, -0.34], [1, 0]]);
+    P([[-0.42, -0.34], [-0.24, -0.72], [0.24, -0.72], [0.42, -0.34]]);
+  }
+  function pathDot(x, y, l) { ctx.moveTo(x - l, y); ctx.lineTo(x + l, y); }
+
+  function draw(dt) {
+    // persistencia del fósforo: borra solo en parte cada fotograma
+    ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(0,0,0,' + (1 - Math.pow(0.5, dt * 60)).toFixed(3) + ')';
+    ctx.fillRect(0, 0, W, H);
+    const st = shell.state;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, F.y, W, F.h); ctx.clip();
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+
+    // trazo principal (rocas, nave, platillo, balas)
+    ctx.beginPath();
+    for (const r of rocks) pathRock(r);
+    const blink = ship.invuln > 0 && Math.floor(clock * 10) % 2;
+    const shipVisible = ship.alive && ship.hidden <= 0 && !blink && st !== 'menu' && st !== 'over';
+    if (shipVisible) pathShip();
+    if (saucer) pathSaucer(saucer);
+    for (const b of bullets) pathDot(b.x, b.y, 1.4 * U);
+    for (const b of sBullets) pathDot(b.x, b.y, 1.4 * U);
+    for (const d of debris) {
+      const k = d.keep ? Math.min(1, d.life / 0.8) : d.life / d.max, hl = d.len * 0.5 * (d.keep ? 1 : k);
+      if (d.keep && k < 1 && Math.random() > k) continue;
+      const c = Math.cos(d.a) * hl, s = Math.sin(d.a) * hl;
+      ctx.moveTo(d.x - c, d.y - s); ctx.lineTo(d.x + c, d.y + s);
+    }
+    for (const p of dots) if (Math.random() < p.life * 2 + 0.2) pathDot(p.x, p.y, 0.8);
+    ctx.shadowColor = 'rgba(90, 225, 255, 0.95)'; ctx.shadowBlur = 9 * DPR;
+    ctx.strokeStyle = 'rgba(150, 235, 255, 0.85)'; ctx.lineWidth = 2.2;
+    ctx.stroke();
+    ctx.shadowBlur = 0; ctx.strokeStyle = '#f4feff'; ctx.lineWidth = 1.1;
+    ctx.stroke();
+
+    // cristales en dorado
+    if (crystals.length) {
+      ctx.beginPath();
+      for (const c of crystals) {
+        if (c.life < 2.5 && Math.floor(clock * 8) % 2) continue;
+        const r = 7 * U * (1 + Math.sin(c.t * 6) * 0.12);
+        ctx.moveTo(c.x, c.y - r * 1.3); ctx.lineTo(c.x + r, c.y); ctx.lineTo(c.x, c.y + r * 1.3); ctx.lineTo(c.x - r, c.y); ctx.closePath();
+        ctx.moveTo(c.x - r, c.y); ctx.lineTo(c.x + r, c.y); ctx.moveTo(c.x, c.y - r * 1.3); ctx.lineTo(c.x, c.y + r * 1.3);
+      }
+      ctx.shadowColor = 'rgba(255, 200, 60, 0.95)'; ctx.shadowBlur = 10 * DPR; ctx.strokeStyle = 'rgba(255, 212, 71, 0.9)'; ctx.lineWidth = 2;
+      ctx.stroke(); ctx.shadowBlur = 0; ctx.strokeStyle = '#fff4c8'; ctx.lineWidth = 1; ctx.stroke();
+    }
+
+    // aviso de oleada
+    if (banner && st === 'play') {
+      const a = Math.min(1, banner.t * 1.5, (2.2 - banner.t) * 4);
+      ctx.globalAlpha = a; ctx.fillStyle = '#eafcff'; ctx.shadowColor = 'rgba(90,225,255,.9)'; ctx.shadowBlur = 12 * DPR;
+      ctx.font = `${Math.round(44 * U)}px VT323, "Courier New", monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(banner.txt, W / 2, F.y + F.h * 0.3);
+      ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+    }
+    ctx.restore();
+
+    // separador del marcador
+    if (!fieldFull) { ctx.fillStyle = 'rgba(120, 230, 255, 0.05)'; ctx.fillRect(0, F.y - 1, W, 1); }
+  }
+
+  // ---------- Bucle ----------
+  let last = performance.now(), padShown = false;
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const show = shell.state === 'play';
+    if (show !== padShown) {
+      padShown = show; pad.hidden = !show;
+      if (!show) for (const k in tIn) { tIn[k] = false; document.getElementById(btns[k]).classList.remove('on'); }
+    }
+    update(dt); draw(dt); shell.paintHud();
+    requestAnimationFrame(frame);
+  }
+  resize(); attract();
+  requestAnimationFrame(frame);
+
+  window.__game = {
+    shell, bot,
+    info: () => ({ state: shell.state, wave, rocks: rocks.length, bullets: bullets.length, crystals: crystals.length, saucer: saucer ? (saucer.small ? 'small' : 'big') : null,
+      ship: { x: ship.x, y: ship.y, a: ship.a, vx: ship.vx, vy: ship.vy, alive: ship.alive, invuln: ship.invuln }, points: shell.points, field: { y: F.y, h: F.h, w: W } }),
+    rockAtShip() { // coloca una roca grande encima de la nave (para probar el choque)
+      ship.invuln = 0; makeRock('L', ship.x + 60 * U, ship.y, -150 * U, 0);
+    },
+    spawnSaucer() { spawnSaucer(); },
+    dropCrystalAtShip() { dropCrystal(ship.x + 40 * U, ship.y, 0, 0); },
+    clearRocks() { rocks = []; }
+  };
+})();
+</script>
+</body>
+</html>

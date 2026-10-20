@@ -1,6 +1,6 @@
 # Bote Arcade
 
-Cinco minijuegos en una sola app de Telegram, con monedas, anuncios con recompensa y ranking semanal comunes.
+Nueve minijuegos en una sola app de Telegram, con monedas, anuncios con recompensa y ranking semanal comunes.
 
 | Archivo | Juego | Temática |
 | --- | --- | --- |
@@ -9,8 +9,12 @@ Cinco minijuegos en una sola app de Telegram, con monedas, anuncios con recompen
 | `abismo.html` | El Abismo | Submarino en una cueva del fondo del mar |
 | `corta-fruta.html` | Corta Fruta | Cortar fruta tropical y esquivar bombas |
 | `orbita.html` | Órbita | Nave espacial contra asteroides |
+| `check-in.html` | Check-In | Cruzar la ciudad hasta el hotel sin que te timen |
+| `mordisco.html` | Mordisco | Laberinto clásico: comer dulces y huir de las avispas |
+| `asteroides.html` | Asteroides | El clásico vectorial de rocas y platillos |
+| `barriles.html` | La Torre | Plataformas clásicas: barriles, cintas, ascensores y remaches |
 
-- `index.html`: menú con los cinco juegos, el bote total y la cuenta atrás hasta el reparto del domingo.
+- `index.html`: menú con los nueve juegos, el bote total y la cuenta atrás hasta el reparto del domingo.
 - `config.js`: identificador del bloque de AdsGram (`adsgramBlockId`) y bote de ejemplo. Vacío = anuncios simulados.
 - `comun.js`: base común (Telegram, sonido, anuncios, ranking y pantallas) que usan Pila Zen, El Abismo, Corta Fruta y Órbita.
 - `vendor/three.min.js`: motor 3D (Three.js r128) para Ruta Neón y Pila Zen.
