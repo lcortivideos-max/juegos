@@ -293,7 +293,7 @@ h2 { font-family: var(--display); font-weight: 400; font-size: 26px; margin: 0; 
   let muted = store.get('arcade_mute', false);
 
   // ---------- Ranking y bote de ejemplo ----------
-  const POT = Math.round(((window.ARCADE && window.ARCADE.potTotal) || 252) / 12 * 100) / 100;
+  const POT = Math.round(((window.ARCADE && window.ARCADE.potTotal) || 252) / 13 * 100) / 100;
   const SHARES = [20, 13, 10, 8, 7, 6, 5, 4, 4, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
   const NAMES = ['NovaKid', 'Lucía_R', 'pixelmono', 'DaniFast', 'Kaori', 'elTiburón', 'MarAzul', 'zeta99', 'Ruff', 'Inés.G', 'B0lt', 'Carmen77', 'Gatete', 'Hugo_GG', 'nerea', 'Vortex', 'PacoRun', 'Aitana', 'L3o', 'Saúl', 'Moxie', 'Irene_S', 'rayo', 'Teo', 'Valkiria', 'JuanMa', 'Neko', 'Olivia', 'turbo_t', 'Alba', 'Kike', 'Mía', 'Dexter', 'Noa', 'Marcos.P', 'Yuki', 'Rocío', 'Fénix', 'Sergi', 'Lola', 'Quark', 'Pau', 'Zoe', 'Bruno', 'Ari', 'Coco', 'Gael', 'Vera', 'Ximo', 'Unai'];
   const RIVALS = NAMES.slice(0, 20).map((n, i) => ({ name: n, pts: Math.round(9000 * Math.exp(-i * 0.12) / 10) * 10 }));

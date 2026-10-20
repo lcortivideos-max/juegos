@@ -52,7 +52,7 @@ h2 { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: v
 <div class="wrap">
   <header>
     <h1 class="brand">Bote <span>Arcade</span></h1>
-    <p class="hello" id="hello">Doce juegos, un bote cada semana. Elige uno y entra en el ranking.</p>
+    <p class="hello" id="hello">Trece juegos, un bote cada semana. Elige uno y entra en el ranking.</p>
     <div class="pot">
       <span class="lbl">Bote de esta semana</span>
       <span class="amt" id="pot">252,00 €</span>
@@ -95,7 +95,9 @@ h2 { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: v
     { id: 'charca', file: 'charca.html', name: 'La Charca', desc: 'Cruza sin que te pillen.', top: 9000,
       bg: 'linear-gradient(160deg,#3ddc6b,#0b5d8c)', svg: '<svg viewBox="0 0 54 54"><rect x="4" y="30" width="46" height="10" fill="#333"/><rect x="10" y="33" width="8" height="4" fill="#ffd166"/><circle cx="27" cy="20" r="9" fill="#5fd35f"/><circle cx="22" cy="13" r="3.5" fill="#5fd35f"/><circle cx="32" cy="13" r="3.5" fill="#5fd35f"/><circle cx="22" cy="13" r="1.6" fill="#111"/><circle cx="32" cy="13" r="1.6" fill="#111"/><path d="M22 23 Q27 27 32 23" stroke="#1b5e20" stroke-width="1.6" fill="none"/></svg>' },
     { id: 'ladrillos', file: 'ladrillos.html', name: 'Rompeladrillos', desc: 'Rompe todos los ladrillos.', top: 9000,
-      bg: 'linear-gradient(160deg,#3b1d8f,#05030f)', svg: '<svg viewBox="0 0 54 54"><g fill="#ff4fa3"><rect x="6" y="10" width="12" height="6" rx="2"/><rect x="21" y="10" width="12" height="6" rx="2"/></g><g fill="#3df5ff"><rect x="36" y="10" width="12" height="6" rx="2"/><rect x="13" y="19" width="12" height="6" rx="2"/></g><rect x="28" y="19" width="12" height="6" rx="2" fill="#ffd166"/><circle cx="30" cy="34" r="3.5" fill="#fff"/><rect x="18" y="42" width="20" height="5" rx="2.5" fill="#ff4fa3"/></svg>' }
+      bg: 'linear-gradient(160deg,#3b1d8f,#05030f)', svg: '<svg viewBox="0 0 54 54"><g fill="#ff4fa3"><rect x="6" y="10" width="12" height="6" rx="2"/><rect x="21" y="10" width="12" height="6" rx="2"/></g><g fill="#3df5ff"><rect x="36" y="10" width="12" height="6" rx="2"/><rect x="13" y="19" width="12" height="6" rx="2"/></g><rect x="28" y="19" width="12" height="6" rx="2" fill="#ffd166"/><circle cx="30" cy="34" r="3.5" fill="#fff"/><rect x="18" y="42" width="20" height="5" rx="2.5" fill="#ff4fa3"/></svg>' },
+    { id: 'serpiente', file: 'serpiente.html', name: 'Serpiente', desc: 'La del móvil de toda la vida.', top: 6000,
+      bg: 'linear-gradient(160deg,#b7c9a0,#5f7351)', svg: '<svg viewBox="0 0 54 54" fill="#1f2a17"><rect x="8" y="30" width="5" height="5"/><rect x="14" y="30" width="5" height="5"/><rect x="20" y="30" width="5" height="5"/><rect x="26" y="30" width="5" height="5"/><rect x="26" y="24" width="5" height="5"/><rect x="26" y="18" width="5" height="5"/><rect x="32" y="18" width="5" height="5"/><rect x="38" y="18" width="5" height="5"/><rect x="40" y="34" width="4" height="4"/></svg>' }
   ];
   const potTotal = (window.ARCADE && window.ARCADE.potTotal) || 252;
   document.getElementById('pot').textContent = Arcade.fmtEUR(potTotal);
