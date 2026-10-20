@@ -1,6 +1,6 @@
 # Bote Arcade
 
-Nueve minijuegos en una sola app de Telegram, con monedas, anuncios con recompensa y ranking semanal comunes.
+Catorce minijuegos en una sola app de Telegram, con monedas, anuncios con recompensa y ranking semanal comunes.
 
 | Archivo | Juego | Temática |
 | --- | --- | --- |
@@ -13,8 +13,13 @@ Nueve minijuegos en una sola app de Telegram, con monedas, anuncios con recompen
 | `mordisco.html` | Mordisco | Laberinto clásico: comer dulces y huir de las avispas |
 | `asteroides.html` | Asteroides | El clásico vectorial de rocas y platillos |
 | `barriles.html` | La Torre | Plataformas clásicas: barriles, cintas, ascensores y remaches |
+| `invasores.html` | Invasores | Marcianos que bajan en filas |
+| `charca.html` | La Charca | La rana que cruza carretera y río |
+| `ladrillos.html` | Rompeladrillos | Pala, bola y ladrillos con premios |
+| `serpiente.html` | Serpiente | La serpiente del móvil, con modo retro y neón |
+| `glaciar.html` | Glaciar | Pingüino que empuja bloques de hielo, con música propia |
 
-- `index.html`: menú con los nueve juegos, el bote total y la cuenta atrás hasta el reparto del domingo.
+- `index.html`: menú con los catorce juegos, el bote total y la cuenta atrás hasta el reparto del domingo.
 - `config.js`: identificador del bloque de AdsGram (`adsgramBlockId`) y bote de ejemplo. Vacío = anuncios simulados.
 - `comun.js`: base común (Telegram, sonido, anuncios, ranking y pantallas) que usan Pila Zen, El Abismo, Corta Fruta y Órbita.
 - `vendor/three.min.js`: motor 3D (Three.js r128) para Ruta Neón y Pila Zen.

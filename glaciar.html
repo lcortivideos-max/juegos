@@ -14,7 +14,7 @@
   --bg: #d7ebff;
   --ink: #1f2b5c;
   --muted: #5d6c9e;
-  --panel: rgba(250, 252, 255, 0.92);
+  --panel: rgba(250, 252, 255, 0.86);
   --line: rgba(60, 100, 180, 0.22);
   --accent: #2f86ff;
   --onaccent: #ffffff;
@@ -1069,8 +1069,8 @@
     if (!attract) {
       if (phase === 'ready') banner('NIVEL ' + level, cy, '#2f86ff', 'Copos: ' + P.eggs);
       else if (phase === 'clear' && clearInfo) banner('¡Nivel superado!', cy, '#e8408f', clearInfo.bonus ? `${clearInfo.secs} s · bonus +${nf(clearInfo.bonus)}` : `${clearInfo.secs} s`);
-      else if (gemMsgT > 0) banner('¡Diamantes en fila!', cy, '#e8408f');
-      else if (angryMsgT > 0) banner('¡Los copos se enfadan!', cy, '#ff5a3c');
+      else if (gemMsgT > 0) banner('¡Diamantes en fila!', oy + ts * 1.6, '#e8408f');
+      else if (angryMsgT > 0) banner('¡Los copos se enfadan!', oy + ts * 1.6, '#ff5a3c');
     }
   }
 
@@ -1116,8 +1116,8 @@
   window.__game = {
     shell,
     get player() { return player; }, get enemies() { return enemies; }, get slides() { return slides; }, get eggs() { return eggs; },
-    get level() { return level; }, get phase() { return phase; }, get angry() { return angry; }, get attract() { return attract; },
-    get eggsLeft() { return eggs.size; }, get gemDone() { return gemDone; }, get crushes() { return crushes; }, get invuln() { return invuln; },
+    get level() { return level; }, get phase() { return phase; }, get angry() { return angry; }, set angry(v) { angry = !!v; }, set invuln(v) { invuln = v; }, get attract() { return attract; },
+    get eggsLeft() { return eggs.size; }, get gemDone() { return gemDone; }, get crushes() { return crushes; }, get invuln() { return invuln; }, 
     get music() { return { on: music.on, steps: music.steps }; },
     get noHatch() { return noHatch; }, set noHatch(v) { noHatch = !!v; },
     cell(x, y) { return G(x, y); },

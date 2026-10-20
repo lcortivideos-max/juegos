@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const CFG = window.ARCADE || { adsgramBlockId: '', potTotal: 252 };
-  const GAME_IDS = ['ruta', 'pila', 'abismo', 'fruta', 'orbita', 'hotel', 'mordisco', 'asteroides', 'torre', 'invasores', 'charca', 'ladrillos', 'serpiente'];
+  const GAME_IDS = ['ruta', 'pila', 'abismo', 'fruta', 'orbita', 'hotel', 'mordisco', 'asteroides', 'torre', 'invasores', 'charca', 'ladrillos', 'serpiente', 'glaciar'];
 
   // ---------- Telegram ----------
   const tg = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData ? window.Telegram.WebApp : null;
