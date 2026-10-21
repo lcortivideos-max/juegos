@@ -446,7 +446,7 @@
   }
 
   // Trozos (gibs) y manchas en el suelo
-  const gibGeo = new THREE.IcosahedronGeometry(0.13, 0).toNonIndexed(); gibGeo.computeVertexNormals();
+  const gibGeo = new THREE.IcosahedronGeometry(0.13, 0); gibGeo.computeVertexNormals();
   const GIBN = 90, gibMesh = new THREE.InstancedMesh(gibGeo, new THREE.MeshBasicMaterial({ color: 0xb0a8a0 }), GIBN);
   gibMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); gibMesh.frustumCulled = false; scene.add(gibMesh);
   const gibs = []; for (let i = 0; i < GIBN; i++) { gibs.push({ life: 0, p: new V3(), v: new V3(), r: new THREE.Euler(), rv: new V3(), s: 1 }); gibMesh.setColorAt(i, C(0xffffff)); }
@@ -682,7 +682,7 @@
       const d = Math.sqrt(d2) || 0.001; let ndl = nx == null ? 1 : (dx * nx + dy * ny + dz * nz) / d;
       if (ndl <= 0) continue;
       if (!los(qx, qz, L.x, L.z)) continue;
-      const att = Math.pow(1 - d / L.range, 1.7) * L.int * (0.3 + 0.7 * ndl);
+      const att = Math.pow(1 - d / L.range, 1.7) * L.int * (0.42 + 0.58 * ndl);
       r += L.c.r * att; g += L.c.g * att; b += L.c.b * att;
     }
     out[0] = r; out[1] = g; out[2] = b; return out;
@@ -919,9 +919,19 @@
     rasgador: new THREE.MeshBasicMaterial({ vertexColors: true }), escupidor: new THREE.MeshBasicMaterial({ vertexColors: true }),
     coloso: new THREE.MeshBasicMaterial({ vertexColors: true }), matriarca: new THREE.MeshBasicMaterial({ vertexColors: true })
   };
+  // Lambert con un término de luz ambiental de la zona que se multiplica por el color (no lo lava)
+  function enemyMat() {
+    const m = new THREE.MeshPhongMaterial({ vertexColors: true, emissive: 0x000000, specular: 0x222222, shininess: 20 });
+    m.userData.uEnv = { value: new THREE.Color(0, 0, 0) };
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.uEnv = m.userData.uEnv;
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uEnv;').replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * uEnv * (0.45 + 0.55 * clamp(normal.y * 0.8 + normal.z * 0.4, 0.0, 1.0));');
+    };
+    return m;
+  }
   function makeEnemyMesh(type) {
     const E = EGEO[type], g = new THREE.Group();
-    const mat = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x000000 });
+    const mat = enemyMat();
     const body = new THREE.Mesh(E.body, mat); g.add(body);
     g.add(new THREE.Mesh(E.eyes, eyeMat[type]));
     const u = { mat, legs: [], arms: [], tents: [], body };
@@ -1087,7 +1097,6 @@
     buildLift();
     // recorrido de demostración
     buildDemoPath();
-    shell.stat = Math.max(shell.stat || 0, demo ? 0 : lv);
     if (!demo) shell.stat = lv;
     paintObjective();
   }
@@ -1189,7 +1198,7 @@
     const k = KEYS[(level - 1) % KEYS.length];
     const o = $('biObj'), d = $('biObjDot'), t = $('biObjTxt');
     if (P.key) { o.className = 't go'; d.style.background = '#3dff8a'; d.style.color = '#3dff8a'; t.textContent = '¡Al ascensor de salida!'; }
-    else if (boss && !boss.dead) { o.className = 't'; d.style.background = '#ff8a30'; d.style.color = '#ff8a30'; t.textContent = `La Matriarca tiene la tarjeta ${k.n}`; }
+    else if (boss && !boss.dead) { o.className = 't'; d.style.background = '#ff8a30'; d.style.color = '#ff8a30'; t.textContent = '¡Mata a la Matriarca: tiene la tarjeta!'; }
     else { o.className = 't'; d.style.background = k.css; d.style.color = k.css; t.textContent = `Encuentra la tarjeta ${k.n}`; }
     $('biKills').innerHTML = `Nivel <b>${level}</b> · Bajas <b>${kills}/${killsTotal}</b>`;
   }
@@ -1475,7 +1484,9 @@
     if (e.losOk) return [P.x, P.z];
     const t = flowTarget(e.x, e.z); return t || [e.x, e.z];
   }
+  let freezeAI = false;
   function updateEnemy(e, dt) {
+    if (freezeAI) { e.t += dt; e.mesh.position.x = e.x; animateEnemy(e, dt, 0); return; }
     e.t += dt; e.cd -= dt; e.flash = Math.max(0, e.flash - dt);
     const T = e.T, u = e.mesh.userData;
     const dx = P.x - e.x, dz = P.z - e.z, dist = Math.hypot(dx, dz);
@@ -1585,7 +1596,8 @@
     e.mesh.position.x = e.x; e.mesh.position.z = e.z; e.mesh.rotation.y = e.face;
     envAt(e.x, e.z, _env);
     const f = e.flash > 0 ? 1 : 0;
-    u.mat.emissive.setRGB(_env.r * 0.55 + f, _env.g * 0.55 + f * 0.9, _env.b * 0.55 + f * 0.8);
+    u.mat.userData.uEnv.value.setRGB(Math.min(0.85, 0.16 + _env.r * 0.4), Math.min(0.85, 0.16 + _env.g * 0.4), Math.min(0.85, 0.18 + _env.b * 0.4));
+    u.mat.emissive.setRGB(f * 0.8, f * 0.7, f * 0.6);
     if (e.type === 'rasgador') {
       const sp = mv > 0.5 ? 18 : 3, amp = mv > 0.5 ? 1 : 0.25;
       u.legs.forEach((p) => { const ph = t * sp + (p.userData.k % 2 ? Math.PI : 0) + (p.userData.s > 0 ? 0 : Math.PI); p.rotation.y = p.userData.ry + Math.sin(ph) * 0.4 * amp; p.rotation.z = -Math.max(0, Math.sin(ph + 1.2)) * 0.45 * amp * p.userData.s * -1; });
@@ -1916,7 +1928,7 @@
     face(e) { P.yaw = Math.atan2(-(e.x - P.x), -(e.z - P.z)); },
     nextLevel() { if (phase === 'complete') nextLevel(); },
     setLevel(n) { setupLevel(n, false); phase = 'play'; },
-    swap: swapWeapon, fire
+    swap: swapWeapon, fire, set freeze(v) { freezeAI = v; }
   };
 })();
 </script>
