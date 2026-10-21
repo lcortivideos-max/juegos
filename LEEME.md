@@ -1,11 +1,10 @@
 # Bote Arcade
 
-Diecisiete minijuegos en una sola app de Telegram, con monedas, anuncios con recompensa y ranking semanal comunes.
+Dieciséis minijuegos en una sola app de Telegram, con monedas, anuncios con recompensa y ranking semanal comunes.
 
 | Archivo | Juego | Temática |
 | --- | --- | --- |
 | `ruta-neon.html` | Ruta Neón | Corredor 3D por una ciudad neón |
-| `pila-zen.html` | Pila Zen | Torre de bloques en un templo japonés |
 | `abismo.html` | El Abismo | Submarino en una cueva del fondo del mar |
 | `corta-fruta.html` | Corta Fruta | Cortar fruta tropical y esquivar bombas |
 | `orbita.html` | Órbita | Nave espacial contra asteroides |
@@ -22,7 +21,7 @@ Diecisiete minijuegos en una sola app de Telegram, con monedas, anuncios con rec
 | `turbo-noche.html` | Turbo Noche | Carreras nocturnas en 3D: esquiva el tráfico, llega a los controles a tiempo y escapa de la policía |
 | `base-infierno.html` | Base Infierno | Disparos en primera persona en 3D por un puesto militar en el desierto, de día: tarjetas, ascensor, tres armas y una jefa cada 4 niveles |
 
-- `index.html`: menú con los diecisiete juegos, el bote total y la cuenta atrás hasta el reparto del domingo.
+- `index.html`: menú con los dieciséis juegos, el bote total y la cuenta atrás hasta el reparto del domingo.
 - `config.js`: identificador del bloque de AdsGram (`adsgramBlockId`) y bote de ejemplo. Vacío = anuncios simulados.
 - `comun.js`: base común (Telegram, sonido, anuncios, ranking y pantallas) que usan Pila Zen, El Abismo, Corta Fruta y Órbita.
 - `vendor/three.min.js`: motor 3D (Three.js r128) para Ruta Neón y Pila Zen.
