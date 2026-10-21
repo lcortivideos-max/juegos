@@ -1,7 +1,7 @@
 // Base común de los juegos: Telegram, sonido, anuncios con recompensa, ranking y pantallas.
 (function () {
   'use strict';
-  const CFG = window.ARCADE || { adsgramBlockId: '', potTotal: 252 };
+  const CFG = window.ARCADE || { adsgramBlockId: '', potTotal: 0 };
   const GAME_IDS = ['ruta', 'pila', 'abismo', 'fruta', 'orbita', 'hotel', 'mordisco', 'asteroides', 'torre', 'invasores', 'charca', 'ladrillos', 'serpiente', 'glaciar', 'zombis'];
 
   // ---------- Telegram ----------
@@ -33,7 +33,8 @@
   function writeSave(id, s) { store.set('arcade_' + id, s); }
 
   // ---------- Ranking y bote de ejemplo ----------
-  const POT = Math.round(CFG.potTotal / GAME_IDS.length * 100) / 100;
+  const POT = Math.round((CFG.potTotal || 0) / GAME_IDS.length * 100) / 100;
+  const potLabel = (v) => v > 0 ? fmtEUR(v) : 'Próximamente';
   const SHARES = [20, 13, 10, 8, 7, 6, 5, 4, 4, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
   const NAMES = ['NovaKid', 'Lucía_R', 'pixelmono', 'DaniFast', 'Kaori', 'elTiburón', 'MarAzul', 'zeta99', 'Ruff', 'Inés.G', 'B0lt', 'Carmen77', 'Gatete', 'Hugo_GG', 'nerea', 'Vortex', 'PacoRun', 'Aitana', 'L3o', 'Saúl', 'Moxie', 'Irene_S', 'rayo', 'Teo', 'Valkiria', 'JuanMa', 'Neko', 'Olivia', 'turbo_t', 'Alba'];
   function seeded(seed) { let s = seed; return () => { s = (s * 1664525 + 1013904223) % 4294967296; return s / 4294967296; }; }
@@ -195,11 +196,11 @@
         <div class="sh-card">
           <h1 class="sh-logo"><span class="a">${cfg.title[0]}</span><span class="b">${cfg.title[1]}</span></h1>
           <p class="sh-tag">${cfg.tagline}</p>
-          <div class="sh-pot"><span class="lbl">Bote de este juego</span><span class="amt">${fmtEUR(POT)}</span><span class="sub" id="shMenuStanding"></span></div>
+          <div class="sh-pot"><span class="lbl">Bote de este juego</span><span class="amt">${potLabel(POT)}</span><span class="sub" id="shMenuStanding"></span></div>
           <button class="sh-btn" id="shPlay">Jugar</button>
           <button class="sh-btn ad" id="shPlayX2">Jugar con ${(cfg.coinLabel || 'monedas').toLowerCase()} x2<small>Ver un anuncio</small></button>
           <div class="sh-row"><button class="sh-ghost" id="shRankBtn">Ranking</button><button class="sh-ghost" id="shHowBtn">Cómo se juega</button></div>
-          <p class="sh-note">Prototipo: el bote y los rivales son de ejemplo.</p>
+          <p class="sh-note">${POT > 0 ? 'Prototipo: el bote y los rivales son de ejemplo.' : 'El bote con premios llegará pronto. Los rivales son de ejemplo.'}</p>
         </div>
       </div>
       <div class="sh-screen" id="shHow" hidden>
@@ -213,9 +214,9 @@
       <div class="sh-screen" id="shRanking" hidden>
         <div class="sh-card">
           <h2 class="sh-h2">Ranking semanal</h2>
-          <p class="sh-hint">Bote: ${fmtEUR(POT)}. Cuenta tu mejor partida de la semana; se reparte el domingo entre los 20 primeros.</p>
+          <p class="sh-hint">${POT > 0 ? `Bote: ${fmtEUR(POT)}. Cuenta tu mejor partida de la semana; se reparte el domingo entre los 20 primeros.` : 'Bote: próximamente. Cuenta tu mejor partida de la semana.'}</p>
           <ol class="sh-rank" id="shRankList"></ol>
-          <p class="sh-note">Rivales y bote de ejemplo hasta conectar el servidor.</p>
+          <p class="sh-note">Rivales de ejemplo hasta conectar el servidor.</p>
           <button class="sh-btn" id="shRankBack">Volver</button>
         </div>
       </div>
@@ -281,7 +282,7 @@
       const ol = $('shRankList'); ol.innerHTML = '';
       rows.forEach((r, i) => {
         const li = document.createElement('li'); if (r.me) li.className = 'me';
-        li.innerHTML = `<span class="pos">${i + 1}</span><span class="nm"></span><span class="pts">${fmt(r.pts)}</span><span class="prz">${i < SHARES.length ? fmtEUR(POT * SHARES[i] / 100) : ''}</span>`;
+        li.innerHTML = `<span class="pos">${i + 1}</span><span class="nm"></span><span class="pts">${fmt(r.pts)}</span><span class="prz">${i < SHARES.length && POT > 0 ? fmtEUR(POT * SHARES[i] / 100) : ''}</span>`;
         li.querySelector('.nm').textContent = r.name; ol.appendChild(li);
       });
       const me = ol.querySelector('.me'); if (me) setTimeout(() => me.scrollIntoView({ block: 'center' }), 30);
@@ -412,7 +413,7 @@
   }
 
   window.Arcade = {
-    create, tgInit, loadSave, rivals, standing, fmt, fmtEUR, POT, SHARES, GAME_IDS, tgUser, audio, tone,
+    create, tgInit, loadSave, rivals, standing, fmt, fmtEUR, potLabel, POT, SHARES, GAME_IDS, tgUser, audio, tone,
     get muted() { return muted; }
   };
 })();

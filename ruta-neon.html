@@ -168,7 +168,7 @@ h2 { font-family: var(--display); font-weight: 400; font-size: 26px; margin: 0; 
       <h1 class="logo"><span class="a">Ruta</span><span class="b">Neón</span></h1>
       <p class="tag">Corre, esquiva y lucha por el bote de la semana.</p>
       <div class="pot">
-        <span class="lbl">Bote de este juego</span><span class="amt" id="potAmt">252 €</span>
+        <span class="lbl">Bote de este juego</span><span class="amt" id="potAmt">Próximamente</span>
         <span class="sub" id="menuStanding">Juega una partida para entrar en el ranking.</span>
       </div>
       <button class="btn" id="playBtn">Jugar</button>
@@ -178,7 +178,7 @@ h2 { font-family: var(--display); font-weight: 400; font-size: 26px; margin: 0; 
         <button class="ghost" id="howBtn">Cómo se juega</button>
       </div>
       <a class="ghost" href="index.html" style="text-align:center;text-decoration:none">← Todos los juegos</a>
-      <p class="note">Prototipo: los anuncios, el bote y los rivales son de ejemplo.</p>
+      <p class="note">El bote con premios llegará pronto. Los rivales son de ejemplo.</p>
     </div>
   </div>
 
@@ -199,7 +199,7 @@ h2 { font-family: var(--display); font-weight: 400; font-size: 26px; margin: 0; 
       <h2>Ranking semanal</h2>
       <p class="hint" id="rankInfo"></p>
       <ol class="rank" id="rankList"></ol>
-      <p class="note">Rivales y bote de ejemplo hasta conectar el servidor.</p>
+      <p class="note">Rivales de ejemplo hasta conectar el servidor.</p>
       <button class="btn" id="rankBack">Volver</button>
     </div>
   </div>
@@ -293,7 +293,7 @@ h2 { font-family: var(--display); font-weight: 400; font-size: 26px; margin: 0; 
   let muted = store.get('arcade_mute', false);
 
   // ---------- Ranking y bote de ejemplo ----------
-  const POT = Math.round(((window.ARCADE && window.ARCADE.potTotal) || 252) / 15 * 100) / 100;
+  const POT = Math.round(((window.ARCADE && window.ARCADE.potTotal) || 0) / 15 * 100) / 100;
   const SHARES = [20, 13, 10, 8, 7, 6, 5, 4, 4, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
   const NAMES = ['NovaKid', 'Lucía_R', 'pixelmono', 'DaniFast', 'Kaori', 'elTiburón', 'MarAzul', 'zeta99', 'Ruff', 'Inés.G', 'B0lt', 'Carmen77', 'Gatete', 'Hugo_GG', 'nerea', 'Vortex', 'PacoRun', 'Aitana', 'L3o', 'Saúl', 'Moxie', 'Irene_S', 'rayo', 'Teo', 'Valkiria', 'JuanMa', 'Neko', 'Olivia', 'turbo_t', 'Alba', 'Kike', 'Mía', 'Dexter', 'Noa', 'Marcos.P', 'Yuki', 'Rocío', 'Fénix', 'Sergi', 'Lola', 'Quark', 'Pau', 'Zoe', 'Bruno', 'Ari', 'Coco', 'Gael', 'Vera', 'Ximo', 'Unai'];
   const RIVALS = NAMES.slice(0, 20).map((n, i) => ({ name: n, pts: Math.round(9000 * Math.exp(-i * 0.12) / 10) * 10 }));
@@ -619,7 +619,7 @@ h2 { font-family: var(--display); font-weight: 400; font-size: 26px; margin: 0; 
   function show(id) { screens.forEach((s) => ($('#' + s).hidden = s !== id)); }
   const hud = $('#hud');
   function refreshMenu() {
-    $('#potAmt').textContent = fmtEUR(POT);
+    $('#potAmt').textContent = POT > 0 ? fmtEUR(POT) : 'Próximamente';
     $('#menuStanding').textContent = standingText(save.best);
   }
   function renderRanking() {
@@ -629,12 +629,12 @@ h2 { font-family: var(--display); font-weight: 400; font-size: 26px; margin: 0; 
     const ol = $('#rankList'); ol.innerHTML = '';
     list.forEach((r, i) => {
       const li = document.createElement('li'); if (r.me) li.className = 'me';
-      const prize = i < SHARES.length ? fmtEUR(POT * SHARES[i] / 100) : '';
+      const prize = i < SHARES.length && POT > 0 ? fmtEUR(POT * SHARES[i] / 100) : '';
       li.innerHTML = `<span class="pos">${i + 1}</span><span class="nm"></span><span class="pts">${fmt(r.pts)}</span><span class="prz">${prize}</span>`;
       li.querySelector('.nm').textContent = r.name;
       ol.appendChild(li);
     });
-    $('#rankInfo').textContent = `Bote: ${fmtEUR(POT)}. Cuenta tu mejor partida de la semana; se reparte el domingo entre los 20 primeros.`;
+    $('#rankInfo').textContent = POT > 0 ? `Bote: ${fmtEUR(POT)}. Cuenta tu mejor partida de la semana; se reparte el domingo entre los 20 primeros.` : 'Bote: próximamente. Cuenta tu mejor partida de la semana.';
     const me = ol.querySelector('.me'); if (me) setTimeout(() => me.scrollIntoView({ block: 'center' }), 30);
   }
   let rankReturn = 'menu';
