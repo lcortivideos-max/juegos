@@ -20,7 +20,7 @@ Diecisiete minijuegos en una sola app de Telegram, con monedas, anuncios con rec
 | `glaciar.html` | Glaciar | Pingüino que empuja bloques de hielo, con música propia |
 | `zombis.html` | Noche Zombi | Correr y saltar zombis por una ciudad de noche, subiendo a tejados |
 | `turbo-noche.html` | Turbo Noche | Carreras nocturnas en 3D: esquiva el tráfico, llega a los controles a tiempo y escapa de la policía |
-| `base-infierno.html` | Base Infierno | Disparos en primera persona en 3D por una base lunar: tarjetas, ascensor, tres armas y una jefa cada 4 niveles |
+| `base-infierno.html` | Base Infierno | Disparos en primera persona en 3D por un puesto militar en el desierto, de día: tarjetas, ascensor, tres armas y una jefa cada 4 niveles |
 
 - `index.html`: menú con los diecisiete juegos, el bote total y la cuenta atrás hasta el reparto del domingo.
 - `config.js`: identificador del bloque de AdsGram (`adsgramBlockId`) y bote de ejemplo. Vacío = anuncios simulados.
