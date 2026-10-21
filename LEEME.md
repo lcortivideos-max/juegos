@@ -1,6 +1,6 @@
 # Bote Arcade
 
-Quince minijuegos en una sola app de Telegram, con monedas, anuncios con recompensa y ranking semanal comunes.
+Dieciséis minijuegos en una sola app de Telegram, con monedas, anuncios con recompensa y ranking semanal comunes.
 
 | Archivo | Juego | Temática |
 | --- | --- | --- |
@@ -19,8 +19,9 @@ Quince minijuegos en una sola app de Telegram, con monedas, anuncios con recompe
 | `serpiente.html` | Serpiente | La serpiente del móvil, con modo retro y neón |
 | `glaciar.html` | Glaciar | Pingüino que empuja bloques de hielo, con música propia |
 | `zombis.html` | Noche Zombi | Correr y saltar zombis por una ciudad de noche, subiendo a tejados |
+| `turbo-noche.html` | Turbo Noche | Carreras nocturnas en 3D: esquiva el tráfico, llega a los controles a tiempo y escapa de la policía |
 
-- `index.html`: menú con los quince juegos, el bote total y la cuenta atrás hasta el reparto del domingo.
+- `index.html`: menú con los dieciséis juegos, el bote total y la cuenta atrás hasta el reparto del domingo.
 - `config.js`: identificador del bloque de AdsGram (`adsgramBlockId`) y bote de ejemplo. Vacío = anuncios simulados.
 - `comun.js`: base común (Telegram, sonido, anuncios, ranking y pantallas) que usan Pila Zen, El Abismo, Corta Fruta y Órbita.
 - `vendor/three.min.js`: motor 3D (Three.js r128) para Ruta Neón y Pila Zen.

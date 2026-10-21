@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const CFG = window.ARCADE || { adsgramBlockId: '', potTotal: 0 };
-  const GAME_IDS = ['ruta', 'pila', 'abismo', 'fruta', 'orbita', 'hotel', 'mordisco', 'asteroides', 'torre', 'invasores', 'charca', 'ladrillos', 'serpiente', 'glaciar', 'zombis'];
+  const GAME_IDS = ['ruta', 'pila', 'abismo', 'fruta', 'orbita', 'hotel', 'mordisco', 'asteroides', 'torre', 'invasores', 'charca', 'ladrillos', 'serpiente', 'glaciar', 'zombis', 'turbo'];
 
   // ---------- Telegram ----------
   const tg = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData ? window.Telegram.WebApp : null;
@@ -55,6 +55,7 @@
     const s = standing(list, best);
     if (!s) return 'Juega una partida para entrar en el ranking.';
     if (s.prize > 0) return `Tu mejor: ${fmt(best)} · puesto ${s.pos} · premio ahora: ${fmtEUR(s.prize)}`;
+    if (s.pos <= SHARES.length) return `Tu mejor: ${fmt(best)} · puesto ${s.pos} · entre los ${SHARES.length} primeros.`;
     return `Tu mejor: ${fmt(best)} · puesto ${s.pos}. Te faltan ${fmt(list[SHARES.length - 1].pts - best + 1)} para entrar en premios.`;
   }
 
