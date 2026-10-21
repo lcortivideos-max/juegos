@@ -178,7 +178,7 @@ h2 { font-family: var(--display); font-weight: 400; font-size: 26px; margin: 0; 
         <button class="ghost" id="howBtn">Cómo se juega</button>
       </div>
       <a class="ghost" href="index.html" style="text-align:center;text-decoration:none">← Todos los juegos</a>
-      <p class="note">El bote con premios llegará pronto. Los rivales son de ejemplo.</p>
+      <p class="note">Ranking de práctica contra rivales de la casa. El ranking real con premios llegará pronto.</p>
     </div>
   </div>
 
@@ -199,7 +199,7 @@ h2 { font-family: var(--display); font-weight: 400; font-size: 26px; margin: 0; 
       <h2>Ranking semanal</h2>
       <p class="hint" id="rankInfo"></p>
       <ol class="rank" id="rankList"></ol>
-      <p class="note">Rivales de ejemplo hasta conectar el servidor.</p>
+      <p class="note">Rivales de la casa hasta que abra el ranking real.</p>
       <button class="btn" id="rankBack">Volver</button>
     </div>
   </div>
@@ -274,7 +274,7 @@ h2 { font-family: var(--display); font-weight: 400; font-size: 26px; margin: 0; 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const rand = (a, b) => a + Math.random() * (b - a);
 
-  // ---------- Guardado local (solo comodidad del prototipo) ----------
+  // ---------- Guardado local (en el dispositivo) ----------
   const store = {
     get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
@@ -292,7 +292,7 @@ h2 { font-family: var(--display); font-weight: 400; font-size: 26px; margin: 0; 
   if (!save || save.week !== WEEK) save = { week: WEEK, best: 0, coins: 0, runs: 0 };
   let muted = store.get('arcade_mute', false);
 
-  // ---------- Ranking y bote de ejemplo ----------
+  // ---------- Ranking y bote ----------
   const POT = Math.round(((window.ARCADE && window.ARCADE.potTotal) || 0) / 16 * 100) / 100;
   const SHARES = [20, 13, 10, 8, 7, 6, 5, 4, 4, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
   const NAMES = ['NovaKid', 'Lucía_R', 'pixelmono', 'DaniFast', 'Kaori', 'elTiburón', 'MarAzul', 'zeta99', 'Ruff', 'Inés.G', 'B0lt', 'Carmen77', 'Gatete', 'Hugo_GG', 'nerea', 'Vortex', 'PacoRun', 'Aitana', 'L3o', 'Saúl', 'Moxie', 'Irene_S', 'rayo', 'Teo', 'Valkiria', 'JuanMa', 'Neko', 'Olivia', 'turbo_t', 'Alba', 'Kike', 'Mía', 'Dexter', 'Noa', 'Marcos.P', 'Yuki', 'Rocío', 'Fénix', 'Sergi', 'Lola', 'Quark', 'Pau', 'Zoe', 'Bruno', 'Ari', 'Coco', 'Gael', 'Vera', 'Ximo', 'Unai'];

@@ -32,7 +32,7 @@
   }
   function writeSave(id, s) { store.set('arcade_' + id, s); }
 
-  // ---------- Ranking y bote de ejemplo ----------
+  // ---------- Ranking y bote ----------
   const POT = Math.round((CFG.potTotal || 0) / GAME_IDS.length * 100) / 100;
   const potLabel = (v) => v > 0 ? fmtEUR(v) : 'Próximamente';
   const SHARES = [20, 13, 10, 8, 7, 6, 5, 4, 4, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
@@ -201,7 +201,7 @@
           <button class="sh-btn" id="shPlay">Jugar</button>
           <button class="sh-btn ad" id="shPlayX2">Jugar con ${(cfg.coinLabel || 'monedas').toLowerCase()} x2<small>Ver un anuncio</small></button>
           <div class="sh-row"><button class="sh-ghost" id="shRankBtn">Ranking</button><button class="sh-ghost" id="shHowBtn">Cómo se juega</button></div>
-          <p class="sh-note">${POT > 0 ? 'Prototipo: el bote y los rivales son de ejemplo.' : 'El bote con premios llegará pronto. Los rivales son de ejemplo.'}</p>
+          <p class="sh-note">${POT > 0 ? 'Ranking de práctica contra rivales de la casa.' : 'Ranking de práctica contra rivales de la casa. El ranking real con premios llegará pronto.'}</p>
         </div>
       </div>
       <div class="sh-screen" id="shHow" hidden>
@@ -217,7 +217,7 @@
           <h2 class="sh-h2">Ranking semanal</h2>
           <p class="sh-hint">${POT > 0 ? `Bote: ${fmtEUR(POT)}. Cuenta tu mejor partida de la semana; se reparte el domingo entre los 20 primeros.` : 'Bote: próximamente. Cuenta tu mejor partida de la semana.'}</p>
           <ol class="sh-rank" id="shRankList"></ol>
-          <p class="sh-note">Rivales de ejemplo hasta conectar el servidor.</p>
+          <p class="sh-note">Rivales de la casa hasta que abra el ranking real.</p>
           <button class="sh-btn" id="shRankBack">Volver</button>
         </div>
       </div>
