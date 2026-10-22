@@ -14,13 +14,14 @@ echo "Pega el token NUEVO de tu bot (el de BotFather) y pulsa Intro. No se verá
 stty -echo < /dev/tty 2>/dev/null || true
 IFS= read -r TOKEN < /dev/tty
 stty echo < /dev/tty 2>/dev/null || true
-TOKEN=$(printf '%s' "$TOKEN" | tr -d '[:space:]')
+# Acepta también el mensaje entero de BotFather: se queda solo con el token.
+TOKEN=$(printf '%s' "$TOKEN" | grep -oE '[0-9]{6,}:[A-Za-z0-9_-]{30,}' | head -n1 || true)
 echo
-echo "Token recibido (${#TOKEN} caracteres)."
-case "$TOKEN" in
-  *:*) ;;
-  *) echo "❌ Eso no parece un token (debe tener dos puntos ':'). No he cambiado nada."; exit 1 ;;
-esac
+if [ -z "$TOKEN" ]; then echo "❌ No encuentro un token en lo que has pegado. No he cambiado nada."; exit 1; fi
+if ! curl -fsS "https://api.telegram.org/bot${TOKEN}/getMe" 2>/dev/null | grep -q '"ok":true'; then
+  echo "❌ Telegram no acepta ese token (¿es el último que te dio BotFather?). No he cambiado nada."; exit 1
+fi
+echo "Token válido ✔"
 printf 'BOT_TOKEN=%s\n' "$TOKEN" > /opt/botearcade/token.env
 chmod 600 /opt/botearcade/token.env
 curl -fsSL https://raw.githubusercontent.com/lcortivideos-max/juegos/main/bot/bot.py -o /opt/botearcade/bot.py || true
