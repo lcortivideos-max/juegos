@@ -10,10 +10,15 @@ cat > "$DIR/poner-token.sh" <<'TOK'
 #!/usr/bin/env bash
 # Guarda el token del bot sin mostrarlo y reinicia el bot.
 set -euo pipefail
-echo "Pega el token NUEVO de tu bot (el de BotFather) y pulsa Intro. No se verá en pantalla:"
-stty -echo < /dev/tty 2>/dev/null || true
-IFS= read -r TOKEN < /dev/tty
-stty echo < /dev/tty 2>/dev/null || true
+if [ "${1:-}" = "--stdin" ]; then
+  # El token llega por la entrada (por ejemplo: type token.txt | ssh oracle sudo poner-token.sh --stdin)
+  TOKEN=$(cat)
+else
+  echo "Pega el token NUEVO de tu bot (el de BotFather) y pulsa Intro. No se verá en pantalla:"
+  stty -echo < /dev/tty 2>/dev/null || true
+  IFS= read -r TOKEN < /dev/tty
+  stty echo < /dev/tty 2>/dev/null || true
+fi
 # Acepta también el mensaje entero de BotFather: se queda solo con el token.
 TOKEN=$(printf '%s' "$TOKEN" | grep -oE '[0-9]{6,}:[A-Za-z0-9_-]{30,}' | head -n1 || true)
 echo
