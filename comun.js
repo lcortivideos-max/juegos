@@ -68,7 +68,7 @@
     if (!s) return 'Juega una partida para entrar en el ranking.';
     if (s.prize > 0) return `Tu mejor: ${fmt(best)} · puesto ${s.pos} · premio ahora: ${fmtEUR(s.prize)}`;
     if (s.pos <= SHARES.length) return `Tu mejor: ${fmt(best)} · puesto ${s.pos} · entre los ${SHARES.length} primeros.`;
-    return `Tu mejor: ${fmt(best)} · puesto ${s.pos}. Te faltan ${fmt(list[SHARES.length - 1].pts - best + 1)} para entrar en premios.`;
+    return `Tu mejor: ${fmt(best)} · puesto ${s.pos}. Te faltan ${fmt(list[SHARES.length - 1].pts - best + 1)} para entrar en el top ${SHARES.length}.`;
   }
 
   // ---------- Sonido y vibración ----------
@@ -210,25 +210,25 @@
         <div class="sh-card">
           <h1 class="sh-logo"><span class="a">${cfg.title[0]}</span><span class="b">${cfg.title[1]}</span></h1>
           <p class="sh-tag">${cfg.tagline}</p>
-          <div class="sh-pot"><span class="lbl">Bote de este juego</span><span class="amt">${potLabel(POT)}</span><span class="sub" id="shMenuStanding"></span></div>
+          <div class="sh-pot"><span class="lbl">${POT > 0 ? 'Bote de este juego' : 'Ranking semanal'}</span><span class="amt">${POT > 0 ? potLabel(POT) : 'Top ' + SHARES.length}</span><span class="sub" id="shMenuStanding"></span></div>
           <button class="sh-btn" id="shPlay">Jugar</button>
           <button class="sh-btn ad" id="shPlayX2">Jugar con ${(cfg.coinLabel || 'monedas').toLowerCase()} x2<small>Ver un anuncio</small></button>
           <div class="sh-row"><button class="sh-ghost" id="shRankBtn">Ranking</button><button class="sh-ghost" id="shHowBtn">Cómo se juega</button></div>
-          <p class="sh-note">${POT > 0 ? 'Ranking de práctica contra rivales de la casa.' : 'Ranking de práctica contra rivales de la casa. El ranking real con premios llegará pronto.'}</p>
+          <p class="sh-note">${POT > 0 ? 'Ranking de práctica contra rivales de la casa.' : 'Ranking de práctica contra rivales de la casa.'}</p>
         </div>
       </div>
       <div class="sh-screen" id="shHow" hidden>
         <div class="sh-card">
           <h2 class="sh-h2">Cómo se juega</h2>
           ${cfg.how.map((h) => `<p class="sh-hint">${h}</p>`).join('')}
-          <p class="sh-hint">Cada ${(cfg.coinSingular || 'moneda')} suma ${coinValue} puntos. Tu mejor partida de la semana cuenta para el ranking, y los 20 primeros se reparten el bote el domingo.</p>
+          <p class="sh-hint">Cada ${(cfg.coinSingular || 'moneda')} suma ${coinValue} puntos. Tu mejor partida de la semana cuenta para el ranking${POT > 0 ? ', y los 20 primeros se reparten el bote el domingo' : ', que se reinicia cada domingo a las 23:59'}.</p>
           <button class="sh-btn" id="shHowBack">Entendido</button>
         </div>
       </div>
       <div class="sh-screen" id="shRanking" hidden>
         <div class="sh-card">
           <h2 class="sh-h2">Ranking semanal</h2>
-          <p class="sh-hint">${POT > 0 ? `Bote: ${fmtEUR(POT)}. Cuenta tu mejor partida de la semana; se reparte el domingo entre los 20 primeros.` : 'Bote: próximamente. Cuenta tu mejor partida de la semana.'}</p>
+          <p class="sh-hint">${POT > 0 ? `Bote: ${fmtEUR(POT)}. Cuenta tu mejor partida de la semana; se reparte el domingo entre los 20 primeros.` : 'Cuenta tu mejor partida de la semana.'}</p>
           <ol class="sh-rank" id="shRankList"></ol>
           <p class="sh-note">Rivales de la casa hasta que abra el ranking real.</p>
           <button class="sh-btn" id="shRankBack">Volver</button>

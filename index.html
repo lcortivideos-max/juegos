@@ -52,18 +52,18 @@ h2 { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: v
 <div class="wrap">
   <header>
     <h1 class="brand">Bote <span>Arcade</span></h1>
-    <p class="hello" id="hello">Dieciséis juegos, un bote cada semana. Elige uno y entra en el ranking.</p>
+    <p class="hello" id="hello">Dieciséis juegos arcade gratis. Elige uno y bate tu récord.</p>
     <div class="pot">
-      <span class="lbl">Bote de esta semana</span>
-      <span class="amt" id="pot">Próximamente</span>
-      <span class="when" id="when">Se reparte el domingo a las 23:59</span>
-      <span class="split" id="split">Cada juego tiene su ranking y su parte del bote. Premios para los 20 primeros de cada uno.</span>
+      <span class="lbl" id="potLbl">Ranking semanal</span>
+      <span class="amt" id="pot">16 juegos</span>
+      <span class="when" id="when">Se reinicia el domingo a las 23:59</span>
+      <span class="split" id="split">Cada juego tiene su propio ranking semanal.</span>
     </div>
   </header>
 
   <h2>Juegos</h2>
   <div class="games" id="games"></div>
-  <p class="note">Ranking de práctica contra rivales de la casa. El ranking real con premios llegará pronto.</p>
+  <p class="note">Ranking de práctica contra rivales de la casa.</p>
 </div>
 <script src="config.js"></script>
 <script src="comun.js"></script>
@@ -114,14 +114,13 @@ h2 { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: v
     sessionStorage.setItem('arcade_started', '1');
   } catch (e) {}
   const potTotal = (window.ARCADE && window.ARCADE.potTotal) || 0;
-  document.getElementById('pot').textContent = Arcade.potLabel(potTotal);
-  if (!potTotal) document.getElementById('split').textContent = 'Cada juego tendrá su ranking y su parte del bote. Muy pronto, premios para los 20 primeros de cada uno.';
+  if (potTotal) { document.getElementById('potLbl').textContent = 'Bote de esta semana'; document.getElementById('pot').textContent = Arcade.potLabel(potTotal); }
   if (Arcade.tgUser && Arcade.tgUser.first_name) {
     document.getElementById('hello').textContent = `Hola, ${Arcade.tgUser.first_name}. Elige un juego y entra en el ranking semanal.`;
   }
   // Cuenta atrás hasta el domingo a las 23:59
   function paintWhen() {
-    if (!potTotal) { document.getElementById('when').textContent = 'Ranking semanal: cierra el domingo a las 23:59'; return; }
+    if (!potTotal) { document.getElementById('when').textContent = 'Se reinicia el domingo a las 23:59'; return; }
     const now = new Date(), end = new Date(now);
     end.setDate(now.getDate() + ((7 - now.getDay()) % 7)); end.setHours(23, 59, 0, 0);
     if (end < now) end.setDate(end.getDate() + 7);
