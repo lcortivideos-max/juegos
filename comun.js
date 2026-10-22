@@ -12,6 +12,18 @@
   }
   const tgUser = tg && tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user : null;
 
+  // ---------- Retar a un amigo ----------
+  const GAME_NAMES = { ruta: 'Ruta Neón', abismo: 'El Abismo', fruta: 'Corta Fruta', orbita: 'Órbita', hotel: 'Check-In', mordisco: 'Mordisco', asteroides: 'Asteroides', torre: 'La Torre', invasores: 'Invasores', charca: 'La Charca', ladrillos: 'Rompeladrillos', serpiente: 'Serpiente', glaciar: 'Glaciar', zombis: 'Noche Zombi', turbo: 'Turbo Noche', infierno: 'Base Infierno' };
+  const APP_LINK = CFG.appLink || 'https://t.me/BoteArcadeBot/Arcade';
+  function share(id, name, pts) {
+    const url = APP_LINK + '?startapp=' + encodeURIComponent(id);
+    const text = pts > 0 ? `He hecho ${fmt(pts)} puntos en ${name} 🎮 ¿Me superas?` : `Juega conmigo a ${name} 🎮 ¿Me superas?`;
+    const link = 'https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(text);
+    if (tg && tg.openTelegramLink) { try { tg.openTelegramLink(link); return; } catch (e) {} }
+    if (navigator.share) { navigator.share({ text, url }).catch(() => {}); return; }
+    window.open(link, '_blank');
+  }
+
   // ---------- Guardado ----------
   const store = {
     get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
@@ -130,6 +142,7 @@
   .sh-btn { appearance: none; border: 0; cursor: pointer; font-family: var(--display); font-size: 20px; padding: 15px 16px; border-radius: 14px; color: var(--onaccent); background: var(--accent); box-shadow: 0 8px 24px var(--shadow); transition: transform .08s ease; }
   .sh-btn:active { transform: scale(.97); }
   .sh-btn.ad { background: var(--gold); color: var(--ongold); font-size: 16px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .sh-btn.share { background: transparent; color: var(--ink); border: 2px solid var(--accent); box-shadow: none; font-size: 17px; padding: 12px 16px; }
   .sh-btn.ad small { font-family: var(--body); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; opacity: .75; }
   .sh-ghost { appearance: none; cursor: pointer; background: transparent; color: var(--ink); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; font-family: var(--body); font-weight: 700; font-size: 15px; text-decoration: none; text-align: center; }
   .sh-btn:focus-visible, .sh-ghost:focus-visible, .sh-pause:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
@@ -240,6 +253,7 @@
           </div>
           <p class="sh-standing" id="shRStanding"></p>
           <button class="sh-btn" id="shAgain">Otra partida</button>
+          <button class="sh-btn share" id="shShare">Reta a un amigo</button>
           <button class="sh-btn ad" id="shAgainX2">Otra con ${(cfg.coinLabel || 'monedas').toLowerCase()} x2<small>Ver un anuncio</small></button>
           <div class="sh-row"><button class="sh-ghost" id="shOverRank">Ranking</button><button class="sh-ghost" id="shOverMenu">Menú</button></div>
         </div>
@@ -327,6 +341,7 @@
     }
     function finish() {
       S.state = 'over'; $('shHud').hidden = true; $('shCount').hidden = true; clearInterval(countTimer);
+      S.lastPts = S.points;
       const pts = S.points, earned = S.coins * S.mult, isBest = pts > save.best;
       save = loadSave(cfg.id);
       save.best = Math.max(save.best, pts); save.coins += earned; save.runs++; writeSave(cfg.id, save);
@@ -383,6 +398,7 @@
     $('shPlay').onclick = () => { audio(); startRun(false); };
     $('shPlayX2').onclick = () => { show(null); showAd(`${(cfg.coinLabel || 'monedas').toLowerCase()} x2`, () => startRun(true), (w) => { S.state = 'menu'; toast(adFailMsg(w)); show('shMenu'); }); };
     $('shAgain').onclick = () => startRun(false);
+    $('shShare').onclick = () => { haptic('light'); share(cfg.id, GAME_NAMES[cfg.id] || cfg.title.join(''), S.lastPts || 0); };
     $('shAgainX2').onclick = () => { show(null); showAd(`${(cfg.coinLabel || 'monedas').toLowerCase()} x2`, () => startRun(true), (w) => { S.state = 'over'; toast(adFailMsg(w)); show('shOver'); }); };
     $('shRankBtn').onclick = () => openRanking('shMenu');
     $('shOverRank').onclick = () => openRanking('shOver');
@@ -414,7 +430,7 @@
   }
 
   window.Arcade = {
-    create, tgInit, loadSave, rivals, standing, fmt, fmtEUR, potLabel, POT, SHARES, GAME_IDS, tgUser, audio, tone,
+    create, tgInit, share, loadSave, rivals, standing, fmt, fmtEUR, potLabel, POT, SHARES, GAME_IDS, tgUser, audio, tone,
     get muted() { return muted; }
   };
 })();

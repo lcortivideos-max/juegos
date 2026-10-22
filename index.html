@@ -105,6 +105,14 @@ h2 { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: v
     { id: 'infierno', file: 'base-infierno.html', name: 'Base Infierno', desc: 'Disparos en una base lunar.', top: 40000,
       bg: 'linear-gradient(135deg,#ff5a1f,#1a0805)', svg: '<svg viewBox="0 0 48 48"><path d="M24 8l5 8h-10z" fill="#ffb02e"/><circle cx="24" cy="26" r="11" fill="#3a1410"/><circle cx="19" cy="24" r="2.6" fill="#ffd34d"/><circle cx="29" cy="24" r="2.6" fill="#ffd34d"/><path d="M17 31h14l-2 3h-10z" fill="#ff5a1f"/><path d="M22 40h4v-6h-4z" fill="#9aa3ad"/></svg>' }
   ];
+  // Enlace de reto (t.me/BoteArcadeBot/Arcade?startapp=serpiente): abre ese juego directamente, una sola vez.
+  try {
+    const tw = window.Telegram && window.Telegram.WebApp;
+    const sp = (tw && tw.initDataUnsafe && tw.initDataUnsafe.start_param) || new URLSearchParams(location.search).get('tgWebAppStartParam');
+    const target = sp && GAMES.find((g) => g.id === sp);
+    if (target && !sessionStorage.getItem('arcade_started')) { sessionStorage.setItem('arcade_started', '1'); location.replace(target.file); return; }
+    sessionStorage.setItem('arcade_started', '1');
+  } catch (e) {}
   const potTotal = (window.ARCADE && window.ARCADE.potTotal) || 0;
   document.getElementById('pot').textContent = Arcade.potLabel(potTotal);
   if (!potTotal) document.getElementById('split').textContent = 'Cada juego tendrá su ranking y su parte del bote. Muy pronto, premios para los 20 primeros de cada uno.';

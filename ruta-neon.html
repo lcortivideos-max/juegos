@@ -99,6 +99,7 @@ h2 { font-family: var(--display); font-weight: 400; font-size: 26px; margin: 0; 
 .btn:active { transform: scale(0.97); }
 .btn:focus-visible, .ghost:focus-visible, .pausebtn:focus-visible, .link:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
 .btn.ad { background: var(--gold); box-shadow: 0 8px 24px rgba(255, 201, 60, 0.3); font-size: 16px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.btn.share { background: transparent; color: var(--ink, #fff); border: 2px solid var(--pink, #ff3d9a); box-shadow: none; font-size: 17px; padding: 12px 16px; }
 .btn.ad small { font-family: var(--body); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.75; }
 .ghost {
   appearance: none; cursor: pointer; background: transparent; color: var(--ink); border: 1px solid var(--line);
@@ -226,6 +227,7 @@ h2 { font-family: var(--display); font-weight: 400; font-size: 26px; margin: 0; 
       </div>
       <p class="standing" id="rStanding"></p>
       <button class="btn" id="againBtn">Otra partida</button>
+      <button class="btn share" id="shareBtn">Reta a un amigo</button>
       <button class="btn ad" id="againX2Btn">Otra con monedas x2<small>Ver un anuncio</small></button>
       <div class="row">
         <button class="ghost" id="overRank">Ranking</button>
@@ -709,9 +711,11 @@ h2 { font-family: var(--display); font-weight: 400; font-size: 26px; margin: 0; 
       beginCountdown();
     }, (why) => { toast(adFailMsg(why)); show('crashed'); });
   }
+  let lastPts = 0;
   function finishRun() {
     state = 'over'; hud.hidden = true;
     const pts = points(), earned = coinCount * mult;
+    lastPts = pts;
     const isBest = pts > save.best;
     save.best = Math.max(save.best, pts); save.coins += earned; save.runs++;
     store.set('arcade_ruta', save);
@@ -732,6 +736,15 @@ h2 { font-family: var(--display); font-weight: 400; font-size: 26px; margin: 0; 
   $('#playBtn').onclick = () => { audio(); startRun(false); };
   $('#playX2Btn').onclick = () => { show(null); showAd('monedas x2', () => startRun(true), (why) => { toast(adFailMsg(why)); show('menu'); }); };
   $('#againBtn').onclick = () => startRun(false);
+  $('#shareBtn').onclick = () => {
+    haptic('light');
+    const url = 'https://t.me/BoteArcadeBot/Arcade?startapp=ruta';
+    const text = lastPts > 0 ? `He hecho ${fmt(lastPts)} puntos en Ruta Neón 🎮 ¿Me superas?` : 'Juega conmigo a Ruta Neón 🎮 ¿Me superas?';
+    const link = 'https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(text);
+    if (tg && tg.openTelegramLink) { try { tg.openTelegramLink(link); return; } catch (e) {} }
+    if (navigator.share) { navigator.share({ text, url }).catch(() => {}); return; }
+    window.open(link, '_blank');
+  };
   $('#againX2Btn').onclick = () => { show(null); showAd('monedas x2', () => startRun(true), (why) => { toast(adFailMsg(why)); show('over'); }); };
   $('#rankBtn').onclick = () => openRanking('menu');
   $('#overRank').onclick = () => openRanking('over');
