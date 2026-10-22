@@ -72,21 +72,21 @@
   }
 
   // ---------- Sonido y vibración ----------
-  let actx = null, muted = store.get('arcade_mute', false);
+  let actx = null, muted = store.get('arcade_mute', false), adMute = false;
   function audio() {
     if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; } }
     if (actx && actx.state === 'suspended') actx.resume();
     return actx;
   }
   function tone(f0, f1, dur, type, vol, delay) {
-    if (muted) return; const a = audio(); if (!a) return;
+    if (muted || adMute) return; const a = audio(); if (!a) return;
     const o = a.createOscillator(), g = a.createGain(), t = a.currentTime + (delay || 0);
     o.type = type || 'sine'; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
     g.gain.setValueAtTime(vol == null ? 0.08 : vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + 0.02);
   }
   function noise(dur, vol, freq) {
-    if (muted) return; const a = audio(); if (!a) return;
+    if (muted || adMute) return; const a = audio(); if (!a) return;
     const n = Math.floor(a.sampleRate * dur), b = a.createBuffer(1, n, a.sampleRate), d = b.getChannelData(0);
     for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
     const s = a.createBufferSource(), g = a.createGain(), f = a.createBiquadFilter();
@@ -107,6 +107,30 @@
   // ---------- Anuncios con recompensa ----------
   let adController = null;
   try { if (CFG.adsgramBlockId && window.Adsgram) adController = window.Adsgram.init({ blockId: CFG.adsgramBlockId }); } catch (e) { adController = null; }
+
+  // GameDistribution (versión para portales de juegos): con gdGameId se usan sus anuncios.
+  const GD = !!CFG.gdGameId;
+  let gdRewarded = false;
+  if (GD) {
+    window.GD_OPTIONS = {
+      gameId: CFG.gdGameId,
+      advertisementSettings: { autoplay: false },
+      onEvent(e) {
+        if (e.name === 'SDK_GAME_PAUSE') adMute = true;
+        else if (e.name === 'SDK_GAME_START') { adMute = false; try { window.gdsdk.preloadAd('rewarded'); } catch (err) {} }
+        else if (e.name === 'SDK_REWARDED_WATCH_COMPLETE') gdRewarded = true;
+      }
+    };
+    const js = document.createElement('script'); js.id = 'gamedistribution-jssdk'; js.src = 'https://html5.api.gamedistribution.com/main.min.js';
+    document.head.appendChild(js);
+  }
+  const gdReady = () => GD && window.gdsdk && typeof window.gdsdk.showAd === 'function';
+  // Anuncio entre partidas (obligatorio en GameDistribution); en Telegram no hace nada.
+  function interstitial(then) {
+    if (!gdReady()) { then(); return; }
+    let fired = false; const go = () => { if (!fired) { fired = true; adMute = false; then(); } };
+    try { window.gdsdk.showAd().then(go, go); } catch (e) { go(); }
+  }
   const adFailMsg = (why) => why === 'error' ? 'Ahora mismo no hay anuncios disponibles. Prueba en un rato.' : 'Tienes que ver el anuncio entero para conseguir la recompensa.';
 
   // ---------- Estilos comunes ----------
@@ -283,7 +307,7 @@
     };
     function syncChrome() {
       const onScreen = screens.some((s) => !$(s).hidden);
-      $('shMute').hidden = !onScreen; $('shHome').hidden = !(onScreen && !$('shMenu').hidden);
+      $('shMute').hidden = !onScreen; $('shHome').hidden = GD || !(onScreen && !$('shMenu').hidden);
     }
     function show(id) { screens.forEach((s) => ($(s).hidden = s !== id)); syncChrome(); }
     let toastT = null;
@@ -308,6 +332,11 @@
     let adTimer = null;
     function showAd(rewardText, done, fail) {
       audio(); S.state = 'ad';
+      if (gdReady()) {
+        gdRewarded = false;
+        window.gdsdk.showAd('rewarded').then(() => setTimeout(() => { adMute = false; gdRewarded ? done() : fail('skip'); }, 50), () => { adMute = false; fail('error'); });
+        return;
+      }
       if (adController) {
         adController.show().then((r) => { if (r && r.done === false) fail('skip'); else done(); }).catch((r) => fail(r && r.error ? 'error' : 'skip'));
         return;
@@ -395,9 +424,10 @@
       if (html !== lastBadges) { $('shBadges').innerHTML = html; lastBadges = html; }
     }
 
-    $('shPlay').onclick = () => { audio(); startRun(false); };
+    $('shPlay').onclick = () => { audio(); interstitial(() => startRun(false)); };
     $('shPlayX2').onclick = () => { show(null); showAd(`${(cfg.coinLabel || 'monedas').toLowerCase()} x2`, () => startRun(true), (w) => { S.state = 'menu'; toast(adFailMsg(w)); show('shMenu'); }); };
-    $('shAgain').onclick = () => startRun(false);
+    $('shAgain').onclick = () => interstitial(() => startRun(false));
+    if (GD) $('shShare').hidden = true;
     $('shShare').onclick = () => { haptic('light'); share(cfg.id, GAME_NAMES[cfg.id] || cfg.title.join(''), S.lastPts || 0); };
     $('shAgainX2').onclick = () => { show(null); showAd(`${(cfg.coinLabel || 'monedas').toLowerCase()} x2`, () => startRun(true), (w) => { S.state = 'over'; toast(adFailMsg(w)); show('shOver'); }); };
     $('shRankBtn').onclick = () => openRanking('shMenu');
