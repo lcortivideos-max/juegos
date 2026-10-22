@@ -67,18 +67,35 @@ def handle(update):
 
 
 def setup():
-    call('setMyCommands', commands=[{'command': 'start', 'description': 'Abrir Bote Arcade'},
-                                    {'command': 'info', 'description': 'Cómo funciona'},
-                                    {'command': 'ayuda', 'description': 'Ayuda'}])
-    call('setChatMenuButton', menu_button={'type': 'web_app', 'text': 'Jugar', 'web_app': {'url': APP_URL}})
-    call('setMyDescription', description='16 juegos arcade gratis en Telegram, con ranking semanal. Pulsa Iniciar para jugar.')
-    call('setMyShortDescription', short_description='16 juegos arcade gratis con ranking semanal.')
+    steps = [
+        ('setMyCommands', {'commands': [{'command': 'start', 'description': 'Abrir Bote Arcade'},
+                                        {'command': 'info', 'description': 'Cómo funciona'},
+                                        {'command': 'ayuda', 'description': 'Ayuda'}]}),
+        ('setChatMenuButton', {'menu_button': {'type': 'web_app', 'text': 'Jugar', 'web_app': {'url': APP_URL}}}),
+        ('setMyDescription', {'description': '16 juegos arcade gratis en Telegram, con ranking semanal. Pulsa Iniciar para jugar.'}),
+        ('setMyShortDescription', {'short_description': '16 juegos arcade gratis con ranking semanal.'}),
+    ]
+    for method, params in steps:
+        try:
+            call(method, **params)
+        except urllib.error.HTTPError as e:
+            if e.code == 401:
+                raise
+            print(method, 'falló:', e.code, flush=True)
+        except Exception as e:
+            print(method, 'falló:', e, flush=True)
 
 
 def main():
     if not TOKEN:
         sys.exit('Falta BOT_TOKEN')
-    setup()
+    while True:
+        try:
+            setup()
+            break
+        except urllib.error.HTTPError:
+            print('Telegram rechaza el token (401). Pon uno nuevo con poner-token.sh', flush=True)
+            time.sleep(300)
     print('Bot en marcha', flush=True)
     offset = 0
     while True:

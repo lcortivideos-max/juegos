@@ -11,14 +11,28 @@ cat > "$DIR/poner-token.sh" <<'TOK'
 # Guarda el token del bot sin mostrarlo y reinicia el bot.
 set -euo pipefail
 echo "Pega el token NUEVO de tu bot (el de BotFather) y pulsa Intro. No se verá en pantalla:"
-read -rs TOKEN < /dev/tty
+stty -echo < /dev/tty 2>/dev/null || true
+IFS= read -r TOKEN < /dev/tty
+stty echo < /dev/tty 2>/dev/null || true
+TOKEN=$(printf '%s' "$TOKEN" | tr -d '[:space:]')
 echo
+echo "Token recibido (${#TOKEN} caracteres)."
+case "$TOKEN" in
+  *:*) ;;
+  *) echo "❌ Eso no parece un token (debe tener dos puntos ':'). No he cambiado nada."; exit 1 ;;
+esac
 printf 'BOT_TOKEN=%s\n' "$TOKEN" > /opt/botearcade/token.env
 chmod 600 /opt/botearcade/token.env
-systemctl enable --now botearcade >/dev/null 2>&1
+curl -fsSL https://raw.githubusercontent.com/lcortivideos-max/juegos/main/bot/bot.py -o /opt/botearcade/bot.py || true
+systemctl enable botearcade >/dev/null 2>&1 || true
 systemctl restart botearcade
-sleep 3
-if systemctl is-active --quiet botearcade; then echo "✅ Bot en marcha. Abre tu bot en Telegram y escribe /start"; else echo "❌ El bot no arrancó: journalctl -u botearcade -n 30"; fi
+sleep 8
+if systemctl is-active --quiet botearcade && journalctl -u botearcade -n 5 --no-pager -o cat | grep -q "Bot en marcha"; then
+  echo "✅ Bot en marcha. Abre tu bot en Telegram y escribe /start"
+else
+  echo "❌ El bot no arrancó. Últimas líneas:"
+  journalctl -u botearcade -n 12 --no-pager -o cat || true
+fi
 TOK
 chmod 700 "$DIR/poner-token.sh"
 touch "$DIR/token.env"
